@@ -1,0 +1,16 @@
+{
+  "name": "@cantrip/error",
+  "version": "0.1.0",
+  "module": "src/mod.ts",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@cantrip/compat": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

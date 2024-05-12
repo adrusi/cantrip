@@ -1,0 +1,16 @@
+{
+  "name": "@cantrip/compat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./iter": "./src/iter.ts",
+    "./iter/async": "./src/iterasync.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

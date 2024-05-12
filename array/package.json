@@ -1,0 +1,19 @@
+{
+  "name": "@cantrip/array",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/mod.ts"
+  },
+  "dependencies": {
+    "@cantrip/error": "workspace:*",
+    "@cantrip/typelevel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

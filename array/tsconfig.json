@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@cantrip/error": ["../error/src/mod.ts"],
+      "@cantrip/typelevel": ["../typelevel/src/mod.ts"]
+    }
+  }
+}

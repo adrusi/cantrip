@@ -1,0 +1,20 @@
+{
+  "name": "@cantrip/iter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./async": "./src/async.ts"
+  },
+  "dependencies": {
+    "@cantrip/error": "workspace:*",
+    "@cantrip/compat": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
