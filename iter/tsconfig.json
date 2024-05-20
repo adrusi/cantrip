@@ -2,8 +2,9 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "paths": {
+      "@cantrip/compat/coro": ["../compat/src/coro.ts"],
       "@cantrip/compat/iter": ["../compat/src/iter.ts"],
-      "@cantrip/compat/iter/async": ["../compat/src/iterasync.ts"],
+      "@cantrip/compat/iter/async": ["../compat/src/iter-async.ts"],
       "@cantrip/error": ["../error/src/mod.ts"]
     }
   }

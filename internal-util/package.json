@@ -1,12 +1,10 @@
 {
-  "name": "@cantrip/compat",
+  "name": "@cantrip/internal-util",
   "version": "0.1.0",
-  "private": true,
+  "module": "src/mod.ts",
   "type": "module",
-  "exports": {
-    "./iter": "./src/iter.ts",
-    "./iter/async": "./src/iter-async.ts"
-  },
+  "private": true,
+  "dependencies": {},
   "devDependencies": {
     "@types/bun": "latest"
   },

@@ -25,6 +25,8 @@ export type IterFromReturn<It extends IterableOrIterator<unknown>> = It extends
         ? Iter<A>
         : never
 
+// export type IterFrom
+
 function asIterator<A>(src: IterableOrIterator<A>): Iterator<A> {
   if (compat.isIterable(src)) return src[compat.ITERATOR]()
   if (compat.isStdIterable(src)) return src[Symbol.iterator]()
@@ -83,41 +85,34 @@ export abstract class Iter<A>
   }
 
   static unsafeFrom<A>(it: compat.Iterator<A>): Iter<A> {
+    let state = {
+      src: it,
+    }
+
     return new (class extends Iter<A> {
-      readonly #src: compat.Iterator<A>
-
-      constructor(src: compat.Iterator<A>) {
-        super()
-        this.#src = src
-      }
-
       next(): compat.IteratorResult<A> {
-        return this.#src.next()
+        return state.src.next()
       }
 
       sizeBounds(): SizeBounds {
         return { min: 0 }
       }
-    })(it)
+    })()
   }
 
   static wrap<A>(it: Iterator<A>): Iter<A> {
+    let state = {
+      src: it,
+      done: false,
+    }
+
     return new (class extends Iter<A> {
-      readonly #src: Iterator<A>
-      #done: boolean
-
-      constructor(src: Iterator<A>) {
-        super()
-        this.#src = src
-        this.#done = false
-      }
-
       next(): compat.IteratorResult<A> {
-        if (this.#done) return { done: true, value: undefined }
+        if (state.done) return { done: true, value: undefined }
 
-        let { done, value } = this.#src.next()
+        let { done, value } = state.src.next()
         if (done) {
-          this.#done = true
+          state.done = true
           return { done: true, value: undefined }
         }
 
@@ -127,7 +122,7 @@ export abstract class Iter<A>
       sizeBounds(): SizeBounds {
         return { min: 0 }
       }
-    })(it)
+    })()
   }
 
   static of<A>(...values: A[]): BackSizeIter<A> {
@@ -149,24 +144,19 @@ export abstract class Iter<A>
   }
 
   map<B>(f: (a: A) => B): Iter<B> {
+    let state: MapState<A> = {
+      src: this,
+    }
+
     return new (class extends Iter<B> {
-      readonly #src: Iter<A>
-
-      constructor(src: Iter<A>) {
-        super()
-        this.#src = src
-      }
-
       next(): compat.IteratorResult<B> {
-        const { done, value } = this.#src.next()
-        if (done) return { done: true, value: undefined }
-        return { done: false, value: f(value) }
+        return mapNext(state, f)
       }
 
       sizeBounds(): SizeBounds {
-        return this.#src.sizeBounds()
+        return state.src.sizeBounds()
       }
-    })(this)
+    })()
   }
 
   flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
@@ -361,7 +351,7 @@ export abstract class BackIter<A>
     return this.nextBack()
   }
 
-  static unsafeFrom<A>(it: compat.BackIterator<A>): BackIter<A> {
+  static override unsafeFrom<A>(it: compat.BackIterator<A>): BackIter<A> {
     return new (class extends BackIter<A> {
       readonly #src: compat.BackIterator<A>
 
@@ -384,125 +374,59 @@ export abstract class BackIter<A>
     })(it)
   }
 
-  map<B>(f: (a: A) => B): BackIter<B> {
+  override map<B>(f: (a: A) => B): BackIter<B> {
+    let state: MapStateBack<A> = {
+      src: this,
+    }
+
     return new (class extends BackIter<B> {
-      readonly #src: BackIter<A>
-
-      constructor(src: BackIter<A>) {
-        super()
-        this.#src = src
-      }
-
       next(): compat.IteratorResult<B> {
-        const { done, value } = this.#src.next()
-        if (done) return { done: true, value: undefined }
-        return { done: false, value: f(value) }
+        return mapNext(state, f)
       }
 
       nextBack(): compat.IteratorResult<B> {
-        const { done, value } = this.#src.nextBack()
-        if (done) return { done: true, value: undefined }
-        return { done: false, value: f(value) }
+        return mapNextBack(state, f)
       }
 
       sizeBounds(): SizeBounds {
-        return this.#src.sizeBounds()
+        return state.src.sizeBounds()
       }
-    })(this)
+    })()
   }
 
-  flatMap<B, IterB extends compat.BackIterator<B> | compat.BackIterable<B>>(
+  override flatMap<
+    B,
+    IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
+  >(f: (a: A) => IterB): BackIter<B>
+  override flatMap<B, IterB extends IterableOrIterator<B>>(
     f: (a: A) => IterB,
-  ): BackIter<B>
-  flatMap<B, IterB extends IterableOrIterator<B>>(f: (a: A) => IterB): Iter<B>
-  flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
+  ): Iter<B>
+  override flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
+    let state: FlatMapStateBack<A, B> = {
+      aSrc: this,
+      bSrc: null,
+      bSrcBack: null,
+      singleEndedIterReceived: false,
+      nextBackInvoked: false,
+    }
+
     return new (class extends BackIter<B> {
-      readonly #aSrc: BackIter<A>
-      #bSrc: Iterator<B> | null
-      #bSrcBack: compat.BackIterator<B> | null
-      #singleEndedIterReceived: boolean
-      #nextBackInvoked: boolean
-
-      constructor(src: BackIter<A>) {
-        super()
-        this.#aSrc = src
-        this.#bSrc = null
-        this.#bSrcBack = null
-        this.#singleEndedIterReceived = false
-        this.#nextBackInvoked = false
-      }
-
-      private enforceHomogeneityInvariant(): void {
-        if (this.#singleEndedIterReceived && this.#nextBackInvoked) {
-          throw new TypeError(
-            "received a single-ended iterator after nextBack was invoked",
-          )
-        }
-      }
-
       next(): compat.IteratorResult<B> {
-        while (true) {
-          if (this.#bSrc === null) {
-            const { done, value } = this.#aSrc.next()
-            if (done) return { done: true, value: undefined }
-
-            let it = f(value)
-
-            if (!this.#singleEndedIterReceived) {
-              if (!compat.isBackIterable(it) && !compat.isBackIterator(it)) {
-                this.#singleEndedIterReceived = true
-              }
-            }
-
-            this.enforceHomogeneityInvariant()
-
-            this.#bSrc = asIterator(it)
-          }
-
-          const { done, value } = this.#bSrc.next()
-          if (done) continue
-
-          return { done: false, value }
-        }
+        return flatMapNext(state, f)
       }
 
       nextBack(): compat.IteratorResult<B> {
-        this.#nextBackInvoked = true
-        this.enforceHomogeneityInvariant()
-
-        while (true) {
-          if (this.#bSrcBack === null) {
-            const { done, value } = this.#aSrc.nextBack()
-            if (done) return { done: true, value: undefined }
-
-            let it = f(value)
-
-            if (compat.isBackIterator(it)) {
-              this.#bSrcBack = it as compat.BackIterator<B>
-            } else if (compat.isBackIterable(it)) {
-              this.#bSrcBack = it[compat.ITERATOR]() as compat.BackIterator<B>
-            } else {
-              this.#singleEndedIterReceived = true
-              this.enforceHomogeneityInvariant()
-              throw "unreachable"
-            }
-          }
-
-          const { done, value } = this.#bSrcBack[compat.NEXT_BACK]()
-          if (done) continue
-
-          return { done: false, value }
-        }
+        return flatMapNextBack(state, f)
       }
 
       sizeBounds(): SizeBounds {
-        let { min } = this.#aSrc.sizeBounds()
+        let { min } = state.aSrc.sizeBounds()
         return { min }
       }
-    })(this)
+    })()
   }
 
-  filter(f: (a: A) => boolean): BackIter<A> {
+  override filter(f: (a: A) => boolean): BackIter<A> {
     return new (class extends BackIter<A> {
       readonly #src: BackIter<A>
 
@@ -534,11 +458,12 @@ export abstract class BackIter<A>
     })(this)
   }
 
-  chain<B, IterB extends compat.BackIterator<B> | compat.BackIterable<B>>(
-    f: IterB,
-  ): BackIter<A | B>
-  chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
-  chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
+  override chain<
+    B,
+    IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
+  >(f: IterB): BackIter<A | B>
+  override chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
+  override chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
     let bs: compat.BackIterator<B>
 
     if (compat.isBackIterable(bs_)) {
@@ -653,7 +578,7 @@ export abstract class SizeIter<A>
     return this.size()
   }
 
-  static unsafeFrom<A>(it: compat.SizeIterator<A>): SizeIter<A> {
+  static override unsafeFrom<A>(it: compat.SizeIterator<A>): SizeIter<A> {
     return new (class extends SizeIter<A> {
       readonly #src: compat.SizeIterator<A>
 
@@ -672,7 +597,7 @@ export abstract class SizeIter<A>
     })(it)
   }
 
-  map<B>(f: (a: A) => B): SizeIter<B> {
+  override map<B>(f: (a: A) => B): SizeIter<B> {
     return new (class extends SizeIter<B> {
       readonly #src: SizeIter<A>
 
@@ -693,7 +618,7 @@ export abstract class SizeIter<A>
     })(this)
   }
 
-  take(n: number): SizeIter<A> {
+  override take(n: number): SizeIter<A> {
     return new (class extends SizeIter<A> {
       readonly #src: SizeIter<A>
       #remaining: number
@@ -723,7 +648,7 @@ export abstract class SizeIter<A>
     })(this)
   }
 
-  drop(n: number): SizeIter<A> {
+  override drop(n: number): SizeIter<A> {
     return new (class extends SizeIter<A> {
       readonly #src: SizeIter<A>
       #hasDropped: boolean
@@ -757,11 +682,12 @@ export abstract class SizeIter<A>
     })(this)
   }
 
-  chain<B, IterB extends compat.SizeIterator<B> | compat.SizeIterable<B>>(
-    f: IterB,
-  ): SizeIter<A | B>
-  chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
-  chain<B>(bs: IterableOrIterator<B>): Iter<A | B> {
+  override chain<
+    B,
+    IterB extends compat.SizeIterator<B> | compat.SizeIterable<B>,
+  >(f: IterB): SizeIter<A | B>
+  override chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
+  override chain<B>(bs: IterableOrIterator<B>): Iter<A | B> {
     if (!compat.isSizeIterable(bs) && !compat.isSizeIterator(bs)) {
       return super.chain(bs)
     }
@@ -829,7 +755,9 @@ export abstract class BackSizeIter<A>
     return this.size()
   }
 
-  static unsafeFrom<A>(it: compat.BackSizeIterator<A>): BackSizeIter<A> {
+  static override unsafeFrom<A>(
+    it: compat.BackSizeIterator<A>,
+  ): BackSizeIter<A> {
     return new (class extends BackSizeIter<A> {
       readonly #src: compat.BackSizeIterator<A>
 
@@ -852,7 +780,7 @@ export abstract class BackSizeIter<A>
     })(it)
   }
 
-  map<B>(f: (a: A) => B): BackSizeIter<B> {
+  override map<B>(f: (a: A) => B): BackSizeIter<B> {
     return new (class extends BackSizeIter<B> {
       readonly #src: BackSizeIter<A>
 
@@ -879,40 +807,43 @@ export abstract class BackSizeIter<A>
     })(this)
   }
 
-  flatMap<B, IterB extends compat.BackIterator<B> | compat.BackIterable<B>>(
+  override flatMap<
+    B,
+    IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
+  >(f: (a: A) => IterB): BackIter<B>
+  override flatMap<B, IterB extends IterableOrIterator<B>>(
     f: (a: A) => IterB,
   ): BackIter<B>
-  flatMap<B, IterB extends IterableOrIterator<B>>(
-    f: (a: A) => IterB,
-  ): BackIter<B>
-  flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
+  override flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
     return BackIter.prototype.flatMap.call(this, f) as Iter<B>
   }
 
-  filter(f: (a: A) => boolean): BackIter<A> {
+  override filter(f: (a: A) => boolean): BackIter<A> {
     return BackIter.prototype.filter.call(this, f) as BackIter<A>
   }
 
-  take(n: number): SizeIter<A> {
+  override take(n: number): SizeIter<A> {
     return SizeIter.prototype.take.call(this, n) as SizeIter<A>
   }
 
-  drop(n: number): SizeIter<A> {
+  override drop(n: number): SizeIter<A> {
     return SizeIter.prototype.drop.call(this, n) as SizeIter<A>
   }
 
-  chain<
+  override chain<
     B,
     IterB extends compat.BackSizeIterator<B> | compat.BackSizeIterable<B>,
   >(f: IterB): BackSizeIter<A | B>
-  chain<B, IterB extends compat.BackIterator<B> | compat.BackIterable<B>>(
-    f: IterB,
-  ): BackIter<A | B>
-  chain<B, IterB extends compat.SizeIterator<B> | compat.SizeIterable<B>>(
-    f: IterB,
-  ): SizeIter<A | B>
-  chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
-  chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
+  override chain<
+    B,
+    IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
+  >(f: IterB): BackIter<A | B>
+  override chain<
+    B,
+    IterB extends compat.SizeIterator<B> | compat.SizeIterable<B>,
+  >(f: IterB): SizeIter<A | B>
+  override chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
+  override chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
     let bs: compat.BackSizeIterator<B>
 
     if (compat.isBackSizeIterable(bs_)) {
@@ -1008,4 +939,114 @@ export abstract class BackSizeIter<A>
   }
 
   abstract size(): number
+}
+
+interface MapState<A> {
+  src: Iter<A>
+}
+
+interface MapStateBack<A> extends MapState<A> {
+  src: BackIter<A>
+}
+
+function mapNext<A, B>(
+  state: MapState<A>,
+  f: (a: A) => B,
+): compat.IteratorResult<B> {
+  const { done, value } = state.src.next()
+  if (done) return { done: true, value: undefined }
+  return { done: false, value: f(value) }
+}
+
+function mapNextBack<A, B>(
+  state: MapStateBack<A>,
+  f: (a: A) => B,
+): compat.IteratorResult<B> {
+  const { done, value } = state.src.nextBack()
+  if (done) return { done: true, value: undefined }
+  return { done: false, value: f(value) }
+}
+
+interface FlatMapState<A, B> {
+  aSrc: Iter<A>
+  bSrc: Iterator<B> | null
+  bSrcBack: compat.BackIterator<B> | null
+  singleEndedIterReceived: boolean
+  nextBackInvoked: boolean
+}
+
+interface FlatMapStateBack<A, B> extends FlatMapState<A, B> {
+  aSrc: BackIter<A>
+}
+
+function enforceFlatMapHomogeneityInvariant<A, B>(
+  state: FlatMapState<A, B>,
+): void {
+  if (state.singleEndedIterReceived && state.nextBackInvoked) {
+    throw new TypeError(
+      "received a single-ended iterator during backwards iteration",
+    )
+  }
+}
+
+function flatMapNext<A, B>(
+  state: FlatMapState<A, B>,
+  f: (a: A) => IterableOrIterator<B>,
+): compat.IteratorResult<B> {
+  enforceFlatMapHomogeneityInvariant(state)
+
+  while (true) {
+    if (state.bSrc === null) {
+      const { done, value } = state.aSrc.next()
+      if (done) return { done: true, value: undefined }
+
+      let it = f(value)
+
+      if (!state.singleEndedIterReceived) {
+        if (!compat.isBackIterable(it) && !compat.isBackIterator(it)) {
+          state.singleEndedIterReceived = true
+          enforceFlatMapHomogeneityInvariant(state)
+        }
+      }
+
+      state.bSrc = asIterator(it)
+    }
+
+    const { done, value } = state.bSrc.next()
+    if (done) continue
+
+    return { done: false, value }
+  }
+}
+
+function flatMapNextBack<A, B>(
+  state: FlatMapStateBack<A, B>,
+  f: (a: A) => IterableOrIterator<B>,
+): compat.IteratorResult<B> {
+  state.nextBackInvoked = true
+  enforceFlatMapHomogeneityInvariant(state)
+
+  while (true) {
+    if (state.bSrcBack === null) {
+      const { done, value } = state.aSrc.nextBack()
+      if (done) return { done: true, value: undefined }
+
+      let it = f(value)
+
+      if (compat.isBackIterator(it)) {
+        state.bSrcBack = it as compat.BackIterator<B>
+      } else if (compat.isBackIterable(it)) {
+        state.bSrcBack = it[compat.ITERATOR]() as compat.BackIterator<B>
+      } else {
+        state.singleEndedIterReceived = true
+        enforceFlatMapHomogeneityInvariant(state)
+        throw "unreachable"
+      }
+    }
+
+    const { done, value } = state.bSrcBack[compat.NEXT_BACK]()
+    if (done) continue
+
+    return { done: false, value }
+  }
 }

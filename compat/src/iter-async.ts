@@ -83,12 +83,18 @@ export function isBackSizeIterable(
   return isBackIterable(it) && isSizeIterable(it)
 }
 
-export function isIterator(it: unknown): it is CompatIterator<unknown> {
+export function isStdIterator(it: unknown): it is AsyncIterator<unknown> {
   return (
     typeof it === "object" &&
     it !== null &&
     "next" in it &&
-    typeof it.next === "function" &&
+    typeof it.next === "function"
+  )
+}
+
+export function isIterator(it: unknown): it is CompatIterator<unknown> {
+  return (
+    isStdIterator(it) &&
     IS_ASYNC_ITERATOR in it &&
     typeof it[IS_ASYNC_ITERATOR] === "boolean" &&
     it[IS_ASYNC_ITERATOR]
