@@ -1,0 +1,17 @@
+{
+  "name": "@cantrip/task",
+  "version": "0.1.0",
+  "module": "src/mod.ts",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@cantrip/compat": "workspace:*",
+    "@cantrip/internal-util": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

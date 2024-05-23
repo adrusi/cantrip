@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@cantrip/internal-util": ["../internal-util/src/mod.ts"],
+      "@cantrip/compat/iter/async": ["../compat/src/iter-async.ts"]
+    }
+  }
+}
