@@ -1,0 +1,28 @@
+{
+  "name": "@cantrip/babel-plugin-transform-task-bound",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "keywords": [
+    "babel-plugin"
+  ],
+  "exports": {
+    ".": "./src/mod.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "jest --testMatch='./test/index.js'"
+  },
+  "dependencies": {
+    "@babel/helper-plugin-utils": "^7.24.6"
+  },
+  "devDependencies": {
+    "@babel/plugin-syntax-explicit-resource-management": "^7.24.6",
+    "@types/babel__helper-plugin-utils": "^7.10.3",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "@babel/core": "^7.24.6",
+    "typescript": "^5.4.0"
+  }
+}
