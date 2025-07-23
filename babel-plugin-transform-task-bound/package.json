@@ -14,11 +14,14 @@
     "test": "jest --testMatch='./test/index.js'"
   },
   "dependencies": {
+    "@babel/helper-module-imports": "^7.24.7",
     "@babel/helper-plugin-utils": "^7.24.6"
   },
   "devDependencies": {
     "@babel/plugin-syntax-explicit-resource-management": "^7.24.6",
+    "@types/babel__helper-module-imports": "^7.18.3",
     "@types/babel__helper-plugin-utils": "^7.10.3",
+    "@types/babel__traverse": "^7.20.6",
     "@types/bun": "latest"
   },
   "peerDependencies": {

@@ -35,7 +35,7 @@ export class Task<Result> implements AsyncDisposable {
   static readonly [TASK_ROOTS]: Set<Task<unknown>> = new Set()
 
   readonly #abortController = new AbortController()
-  readonly #result: Promise<Result>
+  readonly #result: PromiseLike<Result>
 
   readonly #children: Set<Task<unknown>> = new Set()
 
@@ -50,15 +50,32 @@ export class Task<Result> implements AsyncDisposable {
     ;(globalThis as any)[CURRENT_TASK] = task
   }
 
-  static spawn<Result>(start: () => Promise<Result>): Task<Result> {
+  static spawn<Result>(start: () => PromiseLike<Result>): Task<Result> {
     const current = Task.current()
 
-    if (current) return current[TASK_SPAWN_CHILD](start)
+    if (!current) {
+      throw new Error(
+        "Task.spawn() invoked outside of a running task. if this is intentional, use Task.spawnRoot()",
+      )
+    }
 
-    const task = new Task(TASK_GUARD, start)
+    return current[TASK_SPAWN_CHILD](start)
+  }
+
+  static spawnRoot<Result>(start: () => PromiseLike<Result>): RootTask<Result> {
+    // Clean up any stale (completed) task from global state
+    const current = Task.current()
+    if (current?.isComplete) {
+      Task.unsafeSetCurrent(undefined)
+    }
+    // Note: We allow spawnRoot() even when there's an active task in global state
+    // due to limitations in tracking JavaScript execution context. This can happen
+    // when control flows through unmanaged code between tasks.
+
+    const task = new Task(TASK_GUARD, start, false)
     Task[TASK_ROOTS].add(task)
     task[TASK_ON_EXIT](() => Task[TASK_ROOTS].delete(task))
-    return task
+    return new RootTask(task)
   }
 
   static async haltAll(params: HaltParams): Promise<void> {
@@ -85,8 +102,11 @@ export class Task<Result> implements AsyncDisposable {
       | AsyncIterable<unknown>,
   >(future: A): A {
     const task = Task.current()
-    if (task === undefined) throw new Error("no task running!")
-    return Task.boundImpl(task, future)
+    if (task === undefined) {
+      throw new Error("no task running!")
+    } else {
+      return Task.boundImpl(task, future)
+    }
   }
 
   private static boundImpl<
@@ -121,7 +141,9 @@ export class Task<Result> implements AsyncDisposable {
                   }),
               ),
               new Promise((_, reject) => {
-                task.signal.addEventListener("abort", reject)
+                task.signal.addEventListener("abort", () => {
+                  reject(task.signal.reason)
+                })
               }),
             ])
           }
@@ -188,7 +210,11 @@ export class Task<Result> implements AsyncDisposable {
     })
   }
 
-  private constructor(guard: typeof TASK_GUARD, start: () => Promise<Result>) {
+  private constructor(
+    guard: typeof TASK_GUARD,
+    start: () => PromiseLike<Result>,
+    isChild: boolean,
+  ) {
     if (guard !== TASK_GUARD) {
       throw new Error("Illegal invocation of Task constructor")
     }
@@ -200,7 +226,7 @@ export class Task<Result> implements AsyncDisposable {
       this.#result = start()
       Task.unsafeSetCurrent(current)
 
-      this.#result.finally(() => {
+      this[TASK_ON_EXIT](() => {
         this.#isComplete = true
       })
     } finally {
@@ -208,8 +234,8 @@ export class Task<Result> implements AsyncDisposable {
     }
   }
 
-  [TASK_SPAWN_CHILD]<Result>(start: () => Promise<Result>): Task<Result> {
-    const task = new Task(TASK_GUARD, start)
+  [TASK_SPAWN_CHILD]<Result>(start: () => PromiseLike<Result>): Task<Result> {
+    const task = new Task(TASK_GUARD, start, true)
 
     this.#children.add(task)
     task[TASK_ON_EXIT](() => this.#children.delete(task))
@@ -218,7 +244,7 @@ export class Task<Result> implements AsyncDisposable {
   }
 
   [TASK_ON_EXIT](onexit: () => void): void {
-    this.#result.finally(onexit)
+    this.#result.then(onexit, onexit)
   }
 
   get signal(): AbortSignal {
@@ -237,6 +263,30 @@ export class Task<Result> implements AsyncDisposable {
         if (this.#deliberatelyHalted) return
         throw new TaskCanceledError(error)
       }
+      throw error
+    }
+  }
+
+  async awaitCompletion(): Promise<Result> {
+    try {
+      const result = await this.#result
+
+      if (0 < this.#children.size) {
+        let incompleteChildren = []
+        for (const child of this.#children) {
+          if (!child.isComplete) {
+            // We halt with an aggressive deadline because this can only happen due to programmer error
+            incompleteChildren.push(child.halt({ deadlineMillis: 0 }))
+          }
+        }
+        if (0 < incompleteChildren.length) {
+          await Promise.all(incompleteChildren)
+          throw new TaskOutlivedParentError(result)
+        }
+      }
+      return result
+    } catch (error) {
+      if (error instanceof InterruptError) throw new TaskCanceledError(error)
       throw error
     }
   }
@@ -298,7 +348,10 @@ export class Task<Result> implements AsyncDisposable {
     }
     await Task.bound(
       Promise.race([
-        this.#result.catch((_) => undefined),
+        this.#result.then(
+          () => {},
+          (_) => undefined,
+        ),
         Promise.all(childHaltPromises),
       ]),
     )
@@ -311,15 +364,22 @@ export class Task<Result> implements AsyncDisposable {
 
     let iterationStartTime = childrenHaltedTime
 
+    const interrupt = new InterruptError()
+
     while (!this.#isComplete) {
-      this.#abortController.abort(new InterruptError())
+      this.#abortController.abort(interrupt)
 
       await Task.bound(
         Promise.race([
-          this.#result.catch((_) => undefined),
+          this.#result.then(
+            () => {},
+            (_) => {},
+          ),
           new Promise((resolve, _reject) => {
             let timeout = remainingTime * timeoutGrowthRate
-            setTimeout(resolve, timeout)
+            setTimeout(() => {
+              resolve(undefined)
+            }, timeout)
           }),
         ]),
       )

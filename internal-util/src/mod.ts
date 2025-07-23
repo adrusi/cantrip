@@ -6,12 +6,12 @@ export function brand<This>(
     private: false
   },
 ): void {
-  context.addInitializer(function (): void {
-    Object.defineProperty(this, context.name, {
-      configurable: false,
-      enumerable: false,
-      writable: false,
-      value: true,
-    })
-  })
+  // context.addInitializer(function (): void {
+  //   Object.defineProperty(this, context.name, {
+  //     configurable: false,
+  //     enumerable: false,
+  //     writable: false,
+  //     value: true,
+  //   })
+  // })
 }
