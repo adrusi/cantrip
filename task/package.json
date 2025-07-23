@@ -5,8 +5,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@cantrip/compat": "workspace:*",
-    "@cantrip/internal-util": "workspace:*"
+    "@cantrip/compat": "*",
+    "@cantrip/internal-util": "*"
   },
   "devDependencies": {
     "@types/bun": "latest"
