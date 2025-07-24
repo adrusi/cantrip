@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, test } from "@jest/globals"
 
 import babel from "@babel/core"
 // @ts-expect-error

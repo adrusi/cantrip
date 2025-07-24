@@ -8,8 +8,8 @@
     "./async": "./src/async.ts"
   },
   "dependencies": {
-    "@cantrip/error": "workspace:*",
-    "@cantrip/compat": "workspace:*"
+    "@cantrip/error": "0.1.0",
+    "@cantrip/compat": "0.1.0"
   },
   "devDependencies": {
     "@types/bun": "latest"

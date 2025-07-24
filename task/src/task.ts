@@ -28,6 +28,32 @@ export type HaltParams = {
   readonly generationalTimeoutGrowthRateGrowthRate?: number
 }
 
+const TASK_AWAIT_COMPLETION = Symbol("TASK_AWAIT_COMPLETION")
+
+export class RootTask implements PromiseLike<void> {
+  #task: Task<void>
+
+  constructor(guard: typeof TASK_GUARD, task: Task<void>) {
+    if (guard !== TASK_GUARD) {
+      throw new Error("Illegal invocation of RootTask constructor")
+    }
+    this.#task = task
+  }
+
+  then<TResult1 = void, TResult2 = never>(
+    onfulfilled?:
+      | ((value: void) => TResult1 | PromiseLike<TResult1>)
+      | null
+      | undefined,
+    onrejected?:
+      | ((reason: any) => TResult2 | PromiseLike<TResult2>)
+      | null
+      | undefined,
+  ): PromiseLike<TResult1 | TResult2> {
+    return this.#task[TASK_AWAIT_COMPLETION]().then(onfulfilled, onrejected)
+  }
+}
+
 export class Task<Result> implements AsyncDisposable {
   @brand
   readonly [TASK_BRAND] = true
@@ -62,7 +88,7 @@ export class Task<Result> implements AsyncDisposable {
     return current[TASK_SPAWN_CHILD](start)
   }
 
-  static spawnRoot<Result>(start: () => PromiseLike<Result>): RootTask<Result> {
+  static spawnRoot(start: () => PromiseLike<void>): RootTask {
     // Clean up any stale (completed) task from global state
     const current = Task.current()
     if (current?.isComplete) {
@@ -75,7 +101,7 @@ export class Task<Result> implements AsyncDisposable {
     const task = new Task(TASK_GUARD, start, false)
     Task[TASK_ROOTS].add(task)
     task[TASK_ON_EXIT](() => Task[TASK_ROOTS].delete(task))
-    return new RootTask(task)
+    return new RootTask(TASK_GUARD, task)
   }
 
   static async haltAll(params: HaltParams): Promise<void> {
@@ -267,7 +293,7 @@ export class Task<Result> implements AsyncDisposable {
     }
   }
 
-  async awaitCompletion(): Promise<Result> {
+  async [TASK_AWAIT_COMPLETION](): Promise<Result> {
     try {
       const result = await this.#result
 
