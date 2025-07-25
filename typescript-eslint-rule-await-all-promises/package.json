@@ -1,0 +1,26 @@
+{
+  "name": "@cantrip/typescript-eslint-rule-await-all-promises",
+  "version": "0.1.0",
+  "module": "src/mod.ts",
+  "type": "commonjs",
+  "private": true,
+  "scripts": {
+    "test": "vitest",
+    "tsc": "tsc"
+  },
+  "dependencies": {
+    "@typescript-eslint/utils": "^8.38.0",
+    "ts-api-utils": "^1.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/rule-tester": "^8.38.0",
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^3.1.4"
+  },
+  "peerDependencies": {
+    "@typescript-eslint/parser": "^6.0.0",
+    "typescript": "^5.4.0"
+  }
+}
