@@ -1,1 +1,1 @@
-# `@cantrip/error`
+# `@cantrip/scope`

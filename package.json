@@ -9,7 +9,7 @@
     "compat",
     "internal-util",
     "iter",
-    "task",
+    "scope",
     "babel-plugin-transform-task-bound"
   ],
   "scripts": {

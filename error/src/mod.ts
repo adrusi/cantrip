@@ -101,7 +101,7 @@ export class ErrorGroup extends Error {
 
   constructor(errors: unknown[]) {
     super(
-      `ErrorGroup:\n${errors.map((e) => e.message ?? "[no message]").join("\n")}`,
+      `ErrorGroup:\n${errors.map((e) => (e instanceof Error ? (e.message ?? "[no message]") : "[not an Error]")).join("\n")}`,
       { cause: errors[0] },
     )
     this.errors = errors
