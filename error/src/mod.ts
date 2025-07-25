@@ -95,11 +95,11 @@ export class ArgumentError extends Error {
   }
 }
 
-export class ErrorGroup<const E extends Error = Error> extends Error {
+export class ErrorGroup extends Error {
   override readonly name = "ErrorGroup"
-  readonly errors: E[]
+  readonly errors: unknown[]
 
-  constructor(errors: E[]) {
+  constructor(errors: unknown[]) {
     super(
       `ErrorGroup:\n${errors.map((e) => e.message ?? "[no message]").join("\n")}`,
       { cause: errors[0] },
@@ -109,6 +109,7 @@ export class ErrorGroup<const E extends Error = Error> extends Error {
 
   override get [IS_PANIC]() {
     for (const error of this.errors) {
+      if (!(error instanceof Error)) continue
       if (error[IS_PANIC]) return true
     }
     return false
@@ -117,6 +118,7 @@ export class ErrorGroup<const E extends Error = Error> extends Error {
   override [ANY](...predicates: Predicate[]): boolean {
     ERROR_LOOP: for (const error of this.errors) {
       for (const predicate of predicates) {
+        if (!(error instanceof Error)) continue
         if (pred(predicate)(error)) continue ERROR_LOOP
       }
       return false
@@ -127,6 +129,7 @@ export class ErrorGroup<const E extends Error = Error> extends Error {
   override [ALL](...predicates: Predicate[]): boolean {
     for (const error of this.errors) {
       for (const predicate of predicates) {
+        if (!(error instanceof Error)) continue
         if (pred(predicate)(error)) return true
       }
     }
