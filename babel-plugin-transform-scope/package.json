@@ -11,7 +11,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "jest --testMatch='./test/index.js'"
+    "test": "vitest run"
   },
   "dependencies": {
     "@babel/helper-module-imports": "^7.24.7",

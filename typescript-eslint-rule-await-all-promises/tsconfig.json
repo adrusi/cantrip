@@ -1,4 +1,5 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "declaration": true,
     "esModuleInterop": true,
@@ -7,11 +8,11 @@
     "outDir": "lib",
     "resolveJsonModule": true,
     "rootDir": "src",
-    "skipLibCheck": true,
     "sourceMap": true,
-    "strict": true,
     "target": "ES2022",
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "noEmit": false,
+    "allowImportingTsExtensions": false
   },
   "include": ["src/**/*.ts"]
 }

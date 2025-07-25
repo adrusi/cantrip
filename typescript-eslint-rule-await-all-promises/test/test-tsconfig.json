@@ -4,5 +4,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["**/*.ts", "*.ts"]
+  "include": ["**/*.ts", "*.ts", "basic.ts.old"]
 }

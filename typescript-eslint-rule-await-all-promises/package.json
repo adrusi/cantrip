@@ -1,11 +1,21 @@
 {
   "name": "@cantrip/typescript-eslint-rule-await-all-promises",
   "version": "0.1.0",
-  "module": "src/mod.ts",
   "type": "commonjs",
   "private": true,
+  "exports": {
+    ".": "./src/mod.ts",
+    "./package.json": "./package.json"
+  },
+  "main": "lib/mod.js",
+  "types": "lib/mod.d.ts",
   "scripts": {
-    "test": "vitest",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "build": "tsc",
+    "clean": "rm -rf lib",
+    "dev": "npm run test:watch",
+    "typecheck": "tsc --noEmit",
     "tsc": "tsc"
   },
   "dependencies": {

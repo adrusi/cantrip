@@ -3,7 +3,7 @@ import tseslint from "typescript-eslint"
 import { RuleTester } from "@typescript-eslint/rule-tester"
 import * as vitest from "vitest"
 
-import { rule as awaitAllPromises } from "../src/rule.js"
+import { rule as awaitAllPromises } from "../src/mod"
 
 RuleTester.afterAll = vitest.afterAll
 RuleTester.it = vitest.it
@@ -16,7 +16,7 @@ const ruleTester = new RuleTester({
     parserOptions: {
       projectService: {
         allowDefaultProject: ["*.ts*"],
-        defaultProject: "tsconfig.json",
+        defaultProject: "test/test-tsconfig.json",
       },
       tsconfigRootDir: path.join(__dirname, ".."),
     },
