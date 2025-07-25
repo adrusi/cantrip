@@ -34,6 +34,7 @@ interface CompatIterator<A> extends Iterator<A> {
   [IS_ITERATOR]: true
   next(): CompatIteratorResult<A>
   return?(value?: unknown): CompatIteratorResult<A>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   throw?(e?: any): CompatIteratorResult<A>
 }
 

@@ -1,5 +1,5 @@
-import type { LE } from "./nat"
 import type { Len, Tuple } from "./tuple"
+import type { LE } from "./nat"
 
 type _Permutations<
   Tuple extends unknown[],

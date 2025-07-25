@@ -1,8 +1,16 @@
 import eslint from "@eslint/js"
+import { globalIgnores } from "eslint/config"
 import prettier from "eslint-config-prettier"
 import tseslint from "typescript-eslint"
 
 export default tseslint.config(
+  globalIgnores([
+    "vitest.config.ts",
+    "typescript-eslint-rule-await-all-promises/vitest.config.ts",
+    "array/*",
+    "coverage/*",
+    "error/*",
+  ]),
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
@@ -10,13 +18,17 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         tsconfigRootDir: import.meta.dirname,
-        project: ["./tsconfig.json", "./*/tsconfig.json"],
+        project: ["./*/tsconfig.json"],
       },
     },
     linterOptions: {
       reportUnusedDisableDirectives: true,
     },
     rules: {
+      "@typescript-eslint/consistent-generic-constructors": [
+        "error",
+        "type-annotation",
+      ],
       "@typescript-eslint/consistent-indexed-object-style": [
         "error",
         "index-signature",
@@ -40,7 +52,10 @@ export default tseslint.config(
           fixStyle: "inline-type-imports",
         },
       ],
-      "@typescript-eslint/explicit-function-return-type": "error",
+      "@typescript-eslint/explicit-function-return-type": [
+        "error",
+        { allowExpressions: true },
+      ],
       "@typescript-eslint/explicit-member-accessibility": "error",
       "@typescript-eslint/explicit-module-boundary-types": "error",
       "default-param-last": "off",
@@ -73,9 +88,13 @@ export default tseslint.config(
         {
           selector: "typeLike",
           format: ["PascalCase"],
+          leadingUnderscore: "allow",
+          trailingUnderscore: "allow",
         },
       ],
       "@typescript-eslint/no-extraneous-class": "error",
+      "@typescript-eslint/no-duplicate-type-constituents": "off",
+      "@typescript-eslint/no-inferrable-types": "off",
       "@typescript-eslint/no-invalid-void-type": "error",
       "@typescript-eslint/no-meaningless-void-operator": "error",
       "@typescript-eslint/no-mixed-enums": "error",
@@ -123,7 +142,7 @@ export default tseslint.config(
       "prefer-promise-reject-errors": "off",
       "@typescript-eslint/prefer-promise-reject-errors": "error",
       "@typescript-eslint/prefer-readonly": "error",
-      "@typescript-eslint/prefer-readonly-parameter-types": ["error"],
+      "@typescript-eslint/prefer-readonly-parameter-types": "off",
       "@typescript-eslint/prefer-return-this-type": "error",
       "@typescript-eslint/prefer-regexp-exec": "error",
       "@typescript-eslint/prefer-reduce-type-parameter": "error",
@@ -133,10 +152,19 @@ export default tseslint.config(
       "@typescript-eslint/restrict-plus-operands": "error",
       "@typescript-eslint/restrict-template-expressions": "error",
       "no-return-await": "off",
-      "@typescript-eslint/return-await": "error",
-      "@typescript-eslint/strict-boolean-expressions": "error",
-      "@typescript-eslint/switch-exhaustiveness-check": "error",
-      "arrow-body-style": ["error", "as-needed"],
+      "@typescript-eslint/return-await": ["error", "always"],
+      "@typescript-eslint/strict-boolean-expressions": [
+        "error",
+        {
+          allowNullableObject: true,
+          allowNullableBoolean: true,
+        },
+      ],
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        { considerDefaultExhaustiveForUnions: true },
+      ],
+      "arrow-body-style": ["off"],
       "constructor-super": "error",
       "capitalized-comments": "off",
       "consistent-this": ["error", "self"],
@@ -164,18 +192,11 @@ export default tseslint.config(
           skipComments: true,
         },
       ],
-      "max-lines-per-function": [
-        "error",
-        {
-          max: 100,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
+      "max-lines-per-function": "off",
       "max-nested-callbacks": [
         "error",
         {
-          max: 3,
+          max: 6,
         },
       ],
       "max-statements": "off",

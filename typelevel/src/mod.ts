@@ -24,5 +24,5 @@ type UnionToIntersection<Union> = (
   : Unreachable
 
 type UnionToOverloads<Union> = UnionToIntersection<
-  Union extends unknown ? { (_: Union): void } : Unreachable
+  Union extends unknown ? (_: Union) => void : Unreachable
 >

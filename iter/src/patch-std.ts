@@ -1,9 +1,9 @@
 import * as compat from "@cantrip/compat/iter"
-import * as acompat from "@cantrip/compat/iter/async"
 
 import { ArrayIter } from "./coll"
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface Array<T> extends compat.BackSizeIterable<T> {}
 }
 

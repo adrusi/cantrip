@@ -1,5 +1,5 @@
-import type { Invalid, Unreachable } from "./signpost"
 import type { Len, Tuple } from "./tuple"
+import type { Invalid } from "./signpost"
 
 export type LE<A extends number, B extends number> =
   Tuple<B> extends [...Tuple<A>, ...infer _Rest] ? true : false

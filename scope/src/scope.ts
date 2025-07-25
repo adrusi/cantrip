@@ -11,19 +11,22 @@ const SCOPE_ERRORS = Symbol("SCOPE_ERRORS")
 
 export class Scope {
   #halted: boolean = false
-  #completeListeners: Set<() => void> = new Set()
-  #procs: Set<Promise<void>> = new Set()
-  #haltListeners: Set<(error: InterruptError) => void> = new Set();
-  [SCOPE_ERRORS]: Set<unknown> = new Set()
 
-  constructor(guard: typeof SCOPE_GUARD) {
+  readonly #completeListeners: Set<() => void> = new Set()
+  readonly #procs: Set<Promise<void>> = new Set()
+  readonly #haltListeners: Set<(error: InterruptError) => void> = new Set()
+
+  public [SCOPE_ERRORS]: Set<unknown> = new Set()
+
+  public constructor(guard: typeof SCOPE_GUARD) {
     if (guard !== SCOPE_GUARD) {
       throw new Error("Illegal invocation of Scope constructor")
     }
   }
 
-  spawn(callback: () => Promise<void>) {
+  public spawn(callback: () => Promise<void>): void {
     const callingScope = currentScope
+    // eslint-disable-next-line consistent-this, @typescript-eslint/no-this-alias
     currentScope = this
     let p = callback()
     currentScope = callingScope
@@ -37,7 +40,7 @@ export class Scope {
     })
   }
 
-  halt() {
+  public halt(): void {
     let interrupt = new InterruptError("Scope halted")
 
     if (!this.#halted) {
@@ -50,7 +53,7 @@ export class Scope {
     throw interrupt
   }
 
-  [SCOPE_NOTIFY](error?: unknown) {
+  public [SCOPE_NOTIFY](error?: unknown): void {
     if (error !== undefined && !(error instanceof InterruptError)) {
       this[SCOPE_ERRORS].add(error)
       try {
@@ -67,21 +70,22 @@ export class Scope {
     }
   }
 
-  [SCOPE_ON_HALT](callback: (error: InterruptError) => void) {
+  public [SCOPE_ON_HALT](callback: (error: InterruptError) => void): void {
     this.#haltListeners.add(callback)
   }
 
-  [SCOPE_OFF_HALT](callback: (error: InterruptError) => void) {
+  public [SCOPE_OFF_HALT](callback: (error: InterruptError) => void): void {
     this.#haltListeners.delete(callback)
   }
 
-  [SCOPE_ON_COMPLETE](callback: () => void) {
+  public [SCOPE_ON_COMPLETE](callback: () => void): void {
     this.#completeListeners.add(callback)
   }
 }
 
 let currentScope: Scope | null = null
 
+// eslint-disable-next-line @typescript-eslint/promise-function-async
 export function withScope(
   callback: (scope: Scope) => Promise<void>,
 ): Promise<void> {
@@ -120,7 +124,7 @@ export async function awaitHook<A>(p: PromiseLike<A>): Promise<A> {
   return await Promise.race([
     p,
     new Promise<A>((_, reject) => {
-      haltListener = (error) => {
+      haltListener = (error): void => {
         reject(error)
       }
       callingScope[SCOPE_ON_HALT](haltListener)
@@ -149,33 +153,35 @@ export function forAwaitHook<A, Return = unknown, Next = unknown>(
 class HookedAsyncIterator<A, Return, Next>
   implements AsyncIterator<A, Return, Next>
 {
-  #iter: AsyncIterator<A, Return, Next>
+  readonly #iter: AsyncIterator<A, Return, Next>
 
-  return?: (
+  public return?: (
     value?: Return | PromiseLike<Return> | undefined,
   ) => Promise<IteratorResult<A, Return>>
 
-  throw?: (e?: any) => Promise<IteratorResult<A, Return>>
+  public throw?: (e?: unknown) => Promise<IteratorResult<A, Return>>
 
-  constructor(iter: AsyncIterator<A, Return, Next>) {
+  public constructor(iter: AsyncIterator<A, Return, Next>) {
     this.#iter = iter
 
     if (typeof iter.return === "function") {
       this.return = async (
         value?: Return | PromiseLike<Return> | undefined,
-      ) => {
+      ): Promise<IteratorResult<A, Return>> => {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return await awaitHook(iter.return!(value))
       }
     }
 
     if (typeof iter.throw === "function") {
-      this.throw = async (e?: any) => {
+      this.throw = async (e?: unknown): Promise<IteratorResult<A, Return>> => {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         return await awaitHook(iter.throw!(e))
       }
     }
   }
 
-  async next(...args: [] | [Next]): Promise<IteratorResult<A, Return>> {
+  public async next(...args: [] | [Next]): Promise<IteratorResult<A, Return>> {
     return await awaitHook(this.#iter.next(...args))
   }
 }
@@ -196,7 +202,7 @@ export function awaitUsingHook<A extends AsyncDisposable>(res: A): A {
   // })
 
   const origDispose = res[Symbol.asyncDispose]
-  res[Symbol.asyncDispose] = async function () {
+  res[Symbol.asyncDispose] = async function (): Promise<void> {
     await awaitHook(origDispose.call(this))
   }
   return res

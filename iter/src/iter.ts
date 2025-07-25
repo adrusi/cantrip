@@ -36,28 +36,31 @@ function asIterator<A>(src: IterableOrIterator<A>): Iterator<A> {
 export abstract class Iter<A>
   implements compat.Iterable<A>, compat.Iterator<A>
 {
-  [Symbol.iterator](): Iter<A> {
+  public [Symbol.iterator](): this {
     return this
   }
-  abstract next(): compat.IteratorResult<A>
-  return(value?: unknown): { done: true; value: undefined } {
-    return { done: true, value: undefined }
-  }
-  throw(e?: any): { done: true; value: undefined } {
+
+  public abstract next(): compat.IteratorResult<A>
+
+  public return(_value?: unknown): { done: true; value: undefined } {
     return { done: true, value: undefined }
   }
 
-  [compat.ITERATOR](): Iter<A> {
-    return this
-  }
-  get [compat.IS_ITERATOR](): true {
-    return true
+  public throw(_e?: unknown): { done: true; value: undefined } {
+    return { done: true, value: undefined }
   }
 
-  static from<const It extends IterableOrIterator<unknown>>(
+  public [compat.ITERATOR](): this {
+    return this
+  }
+
+  public readonly [compat.IS_ITERATOR] = true as const
+
+  public static from<const It extends IterableOrIterator<unknown>>(
     it: It,
   ): IterFromReturn<It>
-  static from(it: IterableOrIterator<unknown>): Iter<unknown> {
+
+  public static from(it: IterableOrIterator<unknown>): Iter<unknown> {
     // TODO this has a lot of redundant checks, and is worth optimizing
     if (compat.isBackSizeIterator(it)) {
       return BackSizeIter.unsafeFrom(it)
@@ -84,93 +87,97 @@ export abstract class Iter<A>
     }
   }
 
-  static unsafeFrom<A>(it: compat.Iterator<A>): Iter<A> {
+  public static unsafeFrom<A>(it: compat.Iterator<A>): Iter<A> {
     let state = {
       src: it,
     }
 
     return new (class extends Iter<A> {
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         return state.src.next()
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         return { min: 0 }
       }
     })()
   }
 
-  static wrap<A>(it: Iterator<A>): Iter<A> {
+  public static wrap<A>(it: Iterator<A>): Iter<A> {
     let state = {
       src: it,
       done: false,
     }
 
     return new (class extends Iter<A> {
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         if (state.done) return { done: true, value: undefined }
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         let { done, value } = state.src.next()
         if (done) {
           state.done = true
           return { done: true, value: undefined }
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         return { done: false, value }
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         return { min: 0 }
       }
     })()
   }
 
-  static of<A>(...values: A[]): BackSizeIter<A> {
+  public static of<A>(...values: A[]): BackSizeIter<A> {
     return Iter.from(values)
   }
 
-  static empty<A>(): BackSizeIter<A> {
+  public static empty<A>(): BackSizeIter<A> {
     return new (class extends BackSizeIter<A> {
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         return { done: true, value: undefined }
       }
-      nextBack(): compat.IteratorResult<A> {
+
+      public nextBack(): compat.IteratorResult<A> {
         return { done: true, value: undefined }
       }
-      size(): number {
+
+      public size(): number {
         return 0
       }
     })()
   }
 
-  map<B>(f: (a: A) => B): Iter<B> {
+  public map<B>(f: (a: A) => B): Iter<B> {
     let state: MapState<A> = {
       src: this,
     }
 
     return new (class extends Iter<B> {
-      next(): compat.IteratorResult<B> {
+      public next(): compat.IteratorResult<B> {
         return mapNext(state, f)
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         return state.src.sizeBounds()
       }
     })()
   }
 
-  flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
+  public flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
     return new (class extends Iter<B> {
       readonly #aSrc: Iter<A>
       #bSrc: Iterator<B> | null
 
-      constructor(src: Iter<A>) {
+      public constructor(src: Iter<A>) {
         super()
         this.#aSrc = src
         this.#bSrc = null
       }
 
-      next(): compat.IteratorResult<B> {
+      public next(): compat.IteratorResult<B> {
         while (true) {
           if (this.#bSrc === null) {
             const { done, value } = this.#aSrc.next()
@@ -179,6 +186,7 @@ export abstract class Iter<A>
             this.#bSrc = asIterator(f(value))
           }
 
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const { done, value } = this.#bSrc.next()
           if (done) continue
 
@@ -186,49 +194,49 @@ export abstract class Iter<A>
         }
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         let { min } = this.#aSrc.sizeBounds()
         return { min }
       }
     })(this)
   }
 
-  filter(f: (a: A) => boolean): Iter<A> {
+  public filter(f: (a: A) => boolean): Iter<A> {
     return new (class extends Iter<A> {
       readonly #src: Iter<A>
 
-      constructor(src: Iter<A>) {
+      public constructor(src: Iter<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         while (true) {
           const { done, value } = this.#src.next()
           if (done) return { done: true, value: undefined }
-          if (f(value)) return { done: false, value: value }
+          if (f(value)) return { done: false, value }
         }
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         let { max } = this.#src.sizeBounds()
         return { min: 0, max }
       }
     })(this)
   }
 
-  take(n: number): Iter<A> {
+  public take(n: number): Iter<A> {
     return new (class extends Iter<A> {
       readonly #src: Iter<A>
       #remaining: number
 
-      constructor(src: Iter<A>) {
+      public constructor(src: Iter<A>) {
         super()
         this.#src = src
         this.#remaining = n
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         if (this.#remaining <= 0) return { done: true, value: undefined }
         this.#remaining -= 1
 
@@ -241,7 +249,7 @@ export abstract class Iter<A>
         return { done, value }
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         let { min, max } = this.#src.sizeBounds()
         return {
           min: Math.min(min, this.#remaining),
@@ -252,18 +260,18 @@ export abstract class Iter<A>
     })(this)
   }
 
-  drop(n: number): Iter<A> {
+  public drop(n: number): Iter<A> {
     return new (class extends Iter<A> {
       readonly #src: Iter<A>
       #hasDropped: boolean
 
-      constructor(src: Iter<A>) {
+      public constructor(src: Iter<A>) {
         super()
         this.#src = src
         this.#hasDropped = false
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         if (!this.#hasDropped) {
           for (let i = 0; i < n; i++) {
             const { done } = this.#src.next()
@@ -279,7 +287,7 @@ export abstract class Iter<A>
         return this.#src.next()
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         if (this.#hasDropped) return this.#src.sizeBounds()
         let { min, max } = this.#src.sizeBounds()
         return {
@@ -290,18 +298,18 @@ export abstract class Iter<A>
     })(this)
   }
 
-  chain<B>(bs: IterableOrIterator<B>): Iter<A | B> {
+  public chain<B>(bs: IterableOrIterator<B>): Iter<A | B> {
     return new (class extends Iter<A | B> {
       #src: Iter<A> | Iter<B>
       #nextSrc: Iter<B> | null
 
-      constructor(aSrc: Iter<A>, bSrc: Iter<B>) {
+      public constructor(aSrc: Iter<A>, bSrc: Iter<B>) {
         super()
         this.#src = aSrc
         this.#nextSrc = bSrc
       }
 
-      next(): compat.IteratorResult<A | B> {
+      public next(): compat.IteratorResult<A | B> {
         const { done, value } = this.#src.next()
         if (done) {
           if (this.#nextSrc) {
@@ -313,10 +321,10 @@ export abstract class Iter<A>
           return { done: true, value: undefined }
         }
 
-        return { done: false, value: value }
+        return { done: false, value }
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         if (!this.#nextSrc) return this.#src.sizeBounds()
 
         let { min: aMin, max: aMax } = this.#src.sizeBounds()
@@ -330,78 +338,82 @@ export abstract class Iter<A>
     })(this, Iter.from(bs))
   }
 
-  abstract sizeBounds(): SizeBounds
+  public abstract sizeBounds(): SizeBounds
 }
 
 export abstract class BackIter<A>
   extends Iter<A>
   implements compat.BackIterable<A>, compat.BackIterator<A>
 {
-  [Symbol.iterator](): BackIter<A> {
+  public override [Symbol.iterator](): this {
     return this
   }
 
-  [compat.ITERATOR](): BackIter<A> {
+  public override [compat.ITERATOR](): this {
     return this
   }
-  get [compat.IS_BACK_ITERABLE](): true {
-    return true
-  }
-  [compat.NEXT_BACK](): compat.IteratorResult<A> {
+
+  public readonly [compat.IS_BACK_ITERABLE] = true as const
+
+  public [compat.NEXT_BACK](): compat.IteratorResult<A> {
     return this.nextBack()
   }
 
-  static override unsafeFrom<A>(it: compat.BackIterator<A>): BackIter<A> {
+  public static override unsafeFrom<A>(
+    it: compat.BackIterator<A>,
+  ): BackIter<A> {
     return new (class extends BackIter<A> {
       readonly #src: compat.BackIterator<A>
 
-      constructor(src: compat.BackIterator<A>) {
+      public constructor(src: compat.BackIterator<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         return this.#src.next()
       }
 
-      nextBack(): compat.IteratorResult<A> {
+      public nextBack(): compat.IteratorResult<A> {
         return this.#src[compat.NEXT_BACK]()
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         return { min: 0 }
       }
     })(it)
   }
 
-  override map<B>(f: (a: A) => B): BackIter<B> {
+  public override map<B>(f: (a: A) => B): BackIter<B> {
     let state: MapStateBack<A> = {
       src: this,
     }
 
     return new (class extends BackIter<B> {
-      next(): compat.IteratorResult<B> {
+      public next(): compat.IteratorResult<B> {
         return mapNext(state, f)
       }
 
-      nextBack(): compat.IteratorResult<B> {
+      public nextBack(): compat.IteratorResult<B> {
         return mapNextBack(state, f)
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         return state.src.sizeBounds()
       }
     })()
   }
 
-  override flatMap<
+  public override flatMap<
     B,
     IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
   >(f: (a: A) => IterB): BackIter<B>
-  override flatMap<B, IterB extends IterableOrIterator<B>>(
+
+  public override flatMap<B, IterB extends IterableOrIterator<B>>(
     f: (a: A) => IterB,
   ): Iter<B>
-  override flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
+
+  public override flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
     let state: FlatMapStateBack<A, B> = {
       aSrc: this,
       bSrc: null,
@@ -411,59 +423,63 @@ export abstract class BackIter<A>
     }
 
     return new (class extends BackIter<B> {
-      next(): compat.IteratorResult<B> {
+      public next(): compat.IteratorResult<B> {
         return flatMapNext(state, f)
       }
 
-      nextBack(): compat.IteratorResult<B> {
+      public nextBack(): compat.IteratorResult<B> {
         return flatMapNextBack(state, f)
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         let { min } = state.aSrc.sizeBounds()
         return { min }
       }
     })()
   }
 
-  override filter(f: (a: A) => boolean): BackIter<A> {
+  public override filter(f: (a: A) => boolean): BackIter<A> {
     return new (class extends BackIter<A> {
       readonly #src: BackIter<A>
 
-      constructor(src: BackIter<A>) {
+      public constructor(src: BackIter<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         while (true) {
           const { done, value } = this.#src.next()
           if (done) return { done: true, value: undefined }
-          if (f(value)) return { done: false, value: value }
+          if (f(value)) return { done: false, value }
         }
       }
 
-      nextBack(): compat.IteratorResult<A> {
+      public nextBack(): compat.IteratorResult<A> {
         while (true) {
           const { done, value } = this.#src.nextBack()
           if (done) return { done: true, value: undefined }
-          if (f(value)) return { done: false, value: value }
+          if (f(value)) return { done: false, value }
         }
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         let { max } = this.#src.sizeBounds()
         return { min: 0, max }
       }
     })(this)
   }
 
-  override chain<
+  public override chain<
     B,
     IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
   >(f: IterB): BackIter<A | B>
-  override chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
-  override chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
+
+  public override chain<B, IterB extends IterableOrIterator<B>>(
+    f: IterB,
+  ): Iter<A | B>
+
+  public override chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
     let bs: compat.BackIterator<B>
 
     if (compat.isBackIterable(bs_)) {
@@ -475,14 +491,17 @@ export abstract class BackIter<A>
     }
 
     return new (class extends BackIter<A | B> {
-      #srcs: Record<"a" | "b", BackIter<A> | BackIter<B> | null>
+      #srcs: {
+        a: BackIter<A> | BackIter<B> | null
+        b: BackIter<A> | BackIter<B> | null
+      }
 
-      constructor(a: BackIter<A>, b: BackIter<B>) {
+      public constructor(a: BackIter<A>, b: BackIter<B>) {
         super()
         this.#srcs = { a, b }
       }
 
-      next(): compat.IteratorResult<A | B> {
+      public next(): compat.IteratorResult<A | B> {
         let srcName: "a" | "b" = this.#srcs.a !== null ? "a" : "b"
         if (this.#srcs[srcName] === null)
           return { done: true, value: undefined }
@@ -496,7 +515,7 @@ export abstract class BackIter<A>
         return { done: false, value: value as A | B }
       }
 
-      nextBack(): compat.IteratorResult<A | B> {
+      public nextBack(): compat.IteratorResult<A | B> {
         let srcName: "a" | "b" = this.#srcs.b === null ? "a" : "b"
         if (this.#srcs[srcName] === null)
           return { done: true, value: undefined }
@@ -510,7 +529,7 @@ export abstract class BackIter<A>
         return { done: false, value: value as A | B }
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         if (this.#srcs.a === null && this.#srcs.b === null) {
           return { min: 0, max: 0 }
         } else if (this.#srcs.a !== null && this.#srcs.b === null) {
@@ -528,32 +547,32 @@ export abstract class BackIter<A>
                 : aMax + bMax,
           }
         } else {
-          throw "unreachable"
+          throw new Error("unreachable")
         }
       }
     })(this, Iter.from(bs))
   }
 
-  abstract nextBack(): compat.IteratorResult<A>
+  public abstract nextBack(): compat.IteratorResult<A>
 
-  reversed(): BackIter<A> {
+  public reversed(): BackIter<A> {
     return new (class extends BackIter<A> {
       readonly #src: BackIter<A>
 
-      constructor(src: BackIter<A>) {
+      public constructor(src: BackIter<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         return this.#src.nextBack()
       }
 
-      nextBack(): compat.IteratorResult<A> {
+      public nextBack(): compat.IteratorResult<A> {
         return this.#src.next()
       }
 
-      sizeBounds(): SizeBounds {
+      public sizeBounds(): SizeBounds {
         return this.#src.sizeBounds()
       }
     })(this)
@@ -564,72 +583,74 @@ export abstract class SizeIter<A>
   extends Iter<A>
   implements compat.SizeIterable<A>, compat.SizeIterator<A>
 {
-  [Symbol.iterator](): SizeIter<A> {
+  public override [Symbol.iterator](): this {
     return this
   }
 
-  [compat.ITERATOR](): SizeIter<A> {
+  public override [compat.ITERATOR](): this {
     return this
   }
-  get [compat.IS_SIZE_ITERABLE](): true {
-    return true
-  }
-  [compat.SIZE](): number {
+
+  public readonly [compat.IS_SIZE_ITERABLE] = true as const
+
+  public [compat.SIZE](): number {
     return this.size()
   }
 
-  static override unsafeFrom<A>(it: compat.SizeIterator<A>): SizeIter<A> {
+  public static override unsafeFrom<A>(
+    it: compat.SizeIterator<A>,
+  ): SizeIter<A> {
     return new (class extends SizeIter<A> {
       readonly #src: compat.SizeIterator<A>
 
-      constructor(src: compat.SizeIterator<A>) {
+      public constructor(src: compat.SizeIterator<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         return this.#src.next()
       }
 
-      size(): number {
+      public size(): number {
         return this.#src[compat.SIZE]()
       }
     })(it)
   }
 
-  override map<B>(f: (a: A) => B): SizeIter<B> {
+  public override map<B>(f: (a: A) => B): SizeIter<B> {
     return new (class extends SizeIter<B> {
       readonly #src: SizeIter<A>
 
-      constructor(src: SizeIter<A>) {
+      public constructor(src: SizeIter<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<B> {
+      public next(): compat.IteratorResult<B> {
         const { done, value } = this.#src.next()
         if (done) return { done: true, value: undefined }
         return { done: false, value: f(value) }
       }
 
-      size(): number {
+      public size(): number {
         return this.#src.size()
       }
     })(this)
   }
 
-  override take(n: number): SizeIter<A> {
+  public override take(n: number): SizeIter<A> {
     return new (class extends SizeIter<A> {
       readonly #src: SizeIter<A>
       #remaining: number
 
-      constructor(src: SizeIter<A>) {
+      public constructor(src: SizeIter<A>) {
         super()
         this.#src = src
         this.#remaining = n
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         if (this.#remaining <= 0) return { done: true, value: undefined }
         this.#remaining -= 1
 
@@ -642,24 +663,24 @@ export abstract class SizeIter<A>
         return { done, value }
       }
 
-      size(): number {
+      public size(): number {
         return Math.min(this.#src.size(), this.#remaining)
       }
     })(this)
   }
 
-  override drop(n: number): SizeIter<A> {
+  public override drop(n: number): SizeIter<A> {
     return new (class extends SizeIter<A> {
       readonly #src: SizeIter<A>
       #hasDropped: boolean
 
-      constructor(src: SizeIter<A>) {
+      public constructor(src: SizeIter<A>) {
         super()
         this.#src = src
         this.#hasDropped = false
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         if (!this.#hasDropped) {
           for (let i = 0; i < n; i++) {
             const { done } = this.#src.next()
@@ -675,19 +696,23 @@ export abstract class SizeIter<A>
         return this.#src.next()
       }
 
-      size(): number {
+      public size(): number {
         if (this.#hasDropped) return this.#src.size()
         return Math.max(this.#src.size() - n, 0)
       }
     })(this)
   }
 
-  override chain<
+  public override chain<
     B,
     IterB extends compat.SizeIterator<B> | compat.SizeIterable<B>,
   >(f: IterB): SizeIter<A | B>
-  override chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
-  override chain<B>(bs: IterableOrIterator<B>): Iter<A | B> {
+
+  public override chain<B, IterB extends IterableOrIterator<B>>(
+    f: IterB,
+  ): Iter<A | B>
+
+  public override chain<B>(bs: IterableOrIterator<B>): Iter<A | B> {
     if (!compat.isSizeIterable(bs) && !compat.isSizeIterator(bs)) {
       return super.chain(bs)
     }
@@ -695,13 +720,13 @@ export abstract class SizeIter<A>
       #src: SizeIter<A> | SizeIter<B>
       #nextSrc: SizeIter<B> | null
 
-      constructor(aSrc: SizeIter<A>, bSrc: SizeIter<B>) {
+      public constructor(aSrc: SizeIter<A>, bSrc: SizeIter<B>) {
         super()
         this.#src = aSrc
         this.#nextSrc = bSrc
       }
 
-      next(): compat.IteratorResult<A | B> {
+      public next(): compat.IteratorResult<A | B> {
         const { done, value } = this.#src.next()
         if (done) {
           if (this.#nextSrc) {
@@ -713,137 +738,145 @@ export abstract class SizeIter<A>
           return { done: true, value: undefined }
         }
 
-        return { done: false, value: value }
+        return { done: false, value }
       }
 
-      size(): number {
+      public size(): number {
         if (!this.#nextSrc) return this.#src.size()
         return this.#src.size() + this.#nextSrc.size()
       }
     })(this, Iter.from(bs as compat.SizeIterable<B> | compat.SizeIterator<B>))
   }
 
-  sizeBounds(): SizeBounds {
+  public sizeBounds(): SizeBounds {
     let size = this.size()
     return { min: size, max: size }
   }
 
-  abstract size(): number
+  public abstract size(): number
 }
 
 export abstract class BackSizeIter<A>
   extends Iter<A>
   implements BackIter<A>, SizeIter<A>
 {
-  [Symbol.iterator](): BackSizeIter<A> {
+  public override [Symbol.iterator](): this {
     return this
   }
 
-  [compat.ITERATOR](): BackSizeIter<A> {
+  public override [compat.ITERATOR](): this {
     return this
   }
-  get [compat.IS_BACK_ITERABLE](): true {
-    return true
-  }
-  get [compat.IS_SIZE_ITERABLE](): true {
-    return true
-  }
-  [compat.NEXT_BACK](): compat.IteratorResult<A> {
+
+  public readonly [compat.IS_BACK_ITERABLE] = true as const
+
+  public readonly [compat.IS_SIZE_ITERABLE] = true as const
+
+  public [compat.NEXT_BACK](): compat.IteratorResult<A> {
     return this.nextBack()
   }
-  [compat.SIZE](): number {
+
+  public [compat.SIZE](): number {
     return this.size()
   }
 
-  static override unsafeFrom<A>(
+  public static override unsafeFrom<A>(
     it: compat.BackSizeIterator<A>,
   ): BackSizeIter<A> {
     return new (class extends BackSizeIter<A> {
       readonly #src: compat.BackSizeIterator<A>
 
-      constructor(src: compat.BackSizeIterator<A>) {
+      public constructor(src: compat.BackSizeIterator<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         return this.#src.next()
       }
 
-      nextBack(): compat.IteratorResult<A> {
+      public nextBack(): compat.IteratorResult<A> {
         return this.#src[compat.NEXT_BACK]()
       }
 
-      size(): number {
+      public size(): number {
         return this.#src[compat.SIZE]()
       }
     })(it)
   }
 
-  override map<B>(f: (a: A) => B): BackSizeIter<B> {
+  public override map<B>(f: (a: A) => B): BackSizeIter<B> {
     return new (class extends BackSizeIter<B> {
       readonly #src: BackSizeIter<A>
 
-      constructor(src: BackSizeIter<A>) {
+      public constructor(src: BackSizeIter<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<B> {
+      public next(): compat.IteratorResult<B> {
         const { done, value } = this.#src.next()
         if (done) return { done: true, value: undefined }
         return { done: false, value: f(value) }
       }
 
-      nextBack(): compat.IteratorResult<B> {
+      public nextBack(): compat.IteratorResult<B> {
         const { done, value } = this.#src.nextBack()
         if (done) return { done: true, value: undefined }
         return { done: false, value: f(value) }
       }
 
-      size(): number {
+      public size(): number {
         return this.#src.size()
       }
     })(this)
   }
 
-  override flatMap<
+  public override flatMap<
     B,
     IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
   >(f: (a: A) => IterB): BackIter<B>
-  override flatMap<B, IterB extends IterableOrIterator<B>>(
+
+  public override flatMap<B, IterB extends IterableOrIterator<B>>(
     f: (a: A) => IterB,
   ): BackIter<B>
-  override flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
+
+  public override flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
     return BackIter.prototype.flatMap.call(this, f) as Iter<B>
   }
 
-  override filter(f: (a: A) => boolean): BackIter<A> {
+  public override filter(f: (a: A) => boolean): BackIter<A> {
     return BackIter.prototype.filter.call(this, f) as BackIter<A>
   }
 
-  override take(n: number): SizeIter<A> {
+  public override take(n: number): SizeIter<A> {
     return SizeIter.prototype.take.call(this, n) as SizeIter<A>
   }
 
-  override drop(n: number): SizeIter<A> {
+  public override drop(n: number): SizeIter<A> {
     return SizeIter.prototype.drop.call(this, n) as SizeIter<A>
   }
 
-  override chain<
+  public override chain<
     B,
     IterB extends compat.BackSizeIterator<B> | compat.BackSizeIterable<B>,
   >(f: IterB): BackSizeIter<A | B>
-  override chain<
+
+  public override chain<
     B,
     IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
   >(f: IterB): BackIter<A | B>
-  override chain<
+
+  public override chain<
     B,
     IterB extends compat.SizeIterator<B> | compat.SizeIterable<B>,
   >(f: IterB): SizeIter<A | B>
-  override chain<B, IterB extends IterableOrIterator<B>>(f: IterB): Iter<A | B>
-  override chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
+
+  public override chain<B, IterB extends IterableOrIterator<B>>(
+    f: IterB,
+  ): Iter<A | B>
+
+  public override chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
     let bs: compat.BackSizeIterator<B>
 
     if (compat.isBackSizeIterable(bs_)) {
@@ -857,14 +890,17 @@ export abstract class BackSizeIter<A>
     }
 
     return new (class extends BackSizeIter<A | B> {
-      #srcs: Record<"a" | "b", BackSizeIter<A> | BackSizeIter<B> | null>
+      #srcs: {
+        a: BackSizeIter<A> | BackSizeIter<B> | null
+        b: BackSizeIter<A> | BackSizeIter<B> | null
+      }
 
-      constructor(a: BackSizeIter<A>, b: BackSizeIter<B>) {
+      public constructor(a: BackSizeIter<A>, b: BackSizeIter<B>) {
         super()
         this.#srcs = { a, b }
       }
 
-      next(): compat.IteratorResult<A | B> {
+      public next(): compat.IteratorResult<A | B> {
         let srcName: "a" | "b" = this.#srcs.a !== null ? "a" : "b"
         if (this.#srcs[srcName] === null)
           return { done: true, value: undefined }
@@ -878,7 +914,7 @@ export abstract class BackSizeIter<A>
         return { done: false, value: value as A | B }
       }
 
-      nextBack(): compat.IteratorResult<A | B> {
+      public nextBack(): compat.IteratorResult<A | B> {
         let srcName: "a" | "b" = this.#srcs.b === null ? "a" : "b"
         if (this.#srcs[srcName] === null)
           return { done: true, value: undefined }
@@ -892,7 +928,7 @@ export abstract class BackSizeIter<A>
         return { done: false, value: value as A | B }
       }
 
-      size(): number {
+      public size(): number {
         if (this.#srcs.a === null && this.#srcs.b === null) {
           return 0
         } else if (this.#srcs.a !== null && this.#srcs.b === null) {
@@ -902,43 +938,43 @@ export abstract class BackSizeIter<A>
         } else if (this.#srcs.a !== null && this.#srcs.b !== null) {
           return this.#srcs.a.size() + this.#srcs.b.size()
         } else {
-          throw "unreachable"
+          throw new Error("unreachable")
         }
       }
     })(this, Iter.from(bs))
   }
 
-  sizeBounds(): SizeBounds {
+  public sizeBounds(): SizeBounds {
     let size = this.size()
     return { min: size, max: size }
   }
 
-  abstract nextBack(): compat.IteratorResult<A>
+  public abstract nextBack(): compat.IteratorResult<A>
 
-  reversed(): BackSizeIter<A> {
+  public reversed(): BackSizeIter<A> {
     return new (class extends BackSizeIter<A> {
       readonly #src: BackSizeIter<A>
 
-      constructor(src: BackSizeIter<A>) {
+      public constructor(src: BackSizeIter<A>) {
         super()
         this.#src = src
       }
 
-      next(): compat.IteratorResult<A> {
+      public next(): compat.IteratorResult<A> {
         return this.#src.nextBack()
       }
 
-      nextBack(): compat.IteratorResult<A> {
+      public nextBack(): compat.IteratorResult<A> {
         return this.#src.next()
       }
 
-      size(): number {
+      public size(): number {
         return this.#src.size()
       }
     })(this)
   }
 
-  abstract size(): number
+  public abstract size(): number
 }
 
 interface MapState<A> {
@@ -1012,6 +1048,7 @@ function flatMapNext<A, B>(
       state.bSrc = asIterator(it)
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { done, value } = state.bSrc.next()
     if (done) continue
 
@@ -1040,7 +1077,7 @@ function flatMapNextBack<A, B>(
       } else {
         state.singleEndedIterReceived = true
         enforceFlatMapHomogeneityInvariant(state)
-        throw "unreachable"
+        throw new Error("unreachable")
       }
     }
 

@@ -2,10 +2,12 @@ import { describe, test, expect } from "vitest"
 
 import { withScope, awaitHook } from "./scope"
 
+// eslint-disable-next-line @typescript-eslint/promise-function-async
 function nextTick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+// eslint-disable-next-line @typescript-eslint/promise-function-async
 function timeout(millis: number): Promise<never> {
   return new Promise((_, reject) => {
     setTimeout(
@@ -17,61 +19,57 @@ function timeout(millis: number): Promise<never> {
 
 class Checkpoint implements PromiseLike<unknown> {
   readonly #name: string
-  #resolve?: (value?: any) => void
-  #reject?: (reason?: any) => void
+  #resolve?: (value?: unknown) => void
+  #reject?: (reason?: unknown) => void
   #isAwaited = false
   #isResolved = false
   readonly #promise: Promise<void>
 
-  constructor(name: string) {
+  public constructor(name: string) {
     this.#name = name
     this.#promise = new Promise((resolve, reject) => {
-      this.#resolve = (value) => {
+      this.#resolve = (_value) => {
         this.#isResolved = true
-        resolve(value)
+        resolve(undefined)
       }
       this.#reject = (reason) => {
         this.#isResolved = true
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
         reject(reason)
       }
     })
-
-    // Track when this checkpoint is awaited
-    this.#promise.then(
-      () => {},
-      () => {},
-    )
   }
 
-  get name(): string {
+  public get name(): string {
     return this.#name
   }
 
-  get isAwaited(): boolean {
+  public get isAwaited(): boolean {
     return this.#isAwaited
   }
 
-  get isResolved(): boolean {
+  public get isResolved(): boolean {
     return this.#isResolved
   }
 
-  resolve(value?: any): void {
+  public resolve(value?: unknown): void {
     if (this.#isResolved) {
       throw new Error(`Checkpoint '${this.#name}' already resolved`)
     }
-    this.#resolve!(value)
+    this.#resolve!(value) // eslint-disable-line @typescript-eslint/no-non-null-assertion
   }
 
-  reject(reason?: any): void {
+  public reject(reason?: unknown): void {
     if (this.#isResolved) {
       throw new Error(`Checkpoint '${this.#name}' already resolved`)
     }
-    this.#reject!(reason)
+    this.#reject!(reason) // eslint-disable-line @typescript-eslint/no-non-null-assertion
   }
 
-  then<T1 = unknown, T2 = never>(
+  // eslint-disable-next-line @typescript-eslint/promise-function-async
+  public then<T1 = unknown, T2 = never>(
     onfulfilled?: (value: unknown) => T1 | PromiseLike<T1>,
-    onrejected?: (reason: any) => T2 | PromiseLike<T2>,
+    onrejected?: (reason: unknown) => T2 | PromiseLike<T2>,
   ): Promise<T1 | T2> {
     this.#isAwaited = true
     return this.#promise.then(onfulfilled, onrejected)
@@ -79,9 +77,9 @@ class Checkpoint implements PromiseLike<unknown> {
 }
 
 class TestController {
-  readonly #checkpoints = new Map<string, Checkpoint>()
+  readonly #checkpoints: Map<string, Checkpoint> = new Map()
 
-  checkpoint(name: string): Checkpoint {
+  public checkpoint(name: string): Checkpoint {
     if (this.#checkpoints.has(name)) {
       throw new Error(`Checkpoint '${name}' already exists`)
     }
@@ -90,17 +88,20 @@ class TestController {
     return chk
   }
 
-  getCheckpoint(name: string): Checkpoint {
+  public getCheckpoint(name: string): Checkpoint {
     const chk = this.#checkpoints.get(name)
     if (!chk) throw new Error(`Checkpoint '${name}' not found`)
     return chk
   }
 
-  async waitForCheckpoint(name: string, timeoutMs = 1000): Promise<void> {
+  public async waitForCheckpoint(
+    name: string,
+    timeoutMs = 1000,
+  ): Promise<void> {
     const chk = this.getCheckpoint(name)
     await Promise.race([
       new Promise<void>((resolve) => {
-        const check = () => {
+        const check = (): void => {
           if (chk.isAwaited) {
             resolve()
           } else {
@@ -113,11 +114,11 @@ class TestController {
     ])
   }
 
-  resolveCheckpoint(name: string, value?: any): void {
+  public resolveCheckpoint(name: string, value?: unknown): void {
     this.getCheckpoint(name).resolve(value)
   }
 
-  rejectCheckpoint(name: string, reason?: any): void {
+  public rejectCheckpoint(name: string, reason?: unknown): void {
     this.getCheckpoint(name).reject(reason)
   }
 }
@@ -139,6 +140,8 @@ describe("async scopes", () => {
       async () => {
         await awaitHook(
           withScope(async (scope) => {
+            await awaitHook(ctrl.checkpoint("start"))
+
             scope.spawn(async () => {
               log.push(1)
               await awaitHook(ctrl.checkpoint("a"))
@@ -148,6 +151,10 @@ describe("async scopes", () => {
         )
       },
       async (subject) => {
+        await ctrl.waitForCheckpoint("start")
+        ctrl.resolveCheckpoint("start")
+        await nextTick()
+
         await ctrl.waitForCheckpoint("a")
         expect(log).toEqual([1])
 
@@ -168,6 +175,8 @@ describe("async scopes", () => {
       async () => {
         await awaitHook(
           withScope(async (scope) => {
+            await awaitHook(ctrl.checkpoint("start"))
+
             scope.spawn(async () => {
               await awaitHook(ctrl.checkpoint("a"))
               log.push(1)
@@ -186,6 +195,10 @@ describe("async scopes", () => {
         )
       },
       async (subject) => {
+        await ctrl.waitForCheckpoint("start")
+        ctrl.resolveCheckpoint("start")
+        await nextTick()
+
         await ctrl.waitForCheckpoint("a")
         ctrl.resolveCheckpoint("a")
         await nextTick()
@@ -212,6 +225,8 @@ describe("async scopes", () => {
       async () => {
         await awaitHook(
           withScope(async (scope) => {
+            await awaitHook(ctrl.checkpoint("start"))
+
             scope.spawn(async () => {
               await awaitHook(ctrl.checkpoint("a1"))
               log.push("a1")
@@ -247,6 +262,10 @@ describe("async scopes", () => {
         )
       },
       async (subject) => {
+        await ctrl.waitForCheckpoint("start")
+        ctrl.resolveCheckpoint("start")
+        await nextTick()
+
         const order = ["a1", "b1", "c1", "a2", "c2", "a3"]
 
         for (let checkpoint of order) {

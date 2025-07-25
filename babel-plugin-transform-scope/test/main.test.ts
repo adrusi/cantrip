@@ -1,7 +1,7 @@
 import { expect, test } from "vitest"
 
 import * as babel from "@babel/core"
-// @ts-expect-error
+// @ts-expect-error plugin doesnt provide type information
 import ermSyntax from "@babel/plugin-syntax-explicit-resource-management"
 import plugin from "../src/mod"
 
@@ -27,7 +27,8 @@ function dedent(
   s = s.replace(/^\n|\n$/g, "")
   const lines = s.split("\n").map((line) => `${line}\n`)
   if (lines.length === 0) return ""
-  const indent = lines[0].match(/^[ \t]+/)![0]
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const indent = /^[ \t]+/.exec(lines[0])![0]
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].startsWith(indent)) {
       throw new Error(

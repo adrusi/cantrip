@@ -26,9 +26,8 @@ export type { CompatIterator as Iterator }
 interface CompatIterator<A> extends AsyncIterator<A, unknown> {
   [IS_ASYNC_ITERATOR]: true
   next(): Promise<IteratorResult<A, unknown>>
-  return?(
-    value?: unknown | PromiseLike<unknown>,
-  ): Promise<IteratorResult<A, unknown>>
+  return?(value?: unknown): Promise<IteratorResult<A, unknown>>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   throw?(e?: any): Promise<IteratorResult<A, unknown>>
 }
 

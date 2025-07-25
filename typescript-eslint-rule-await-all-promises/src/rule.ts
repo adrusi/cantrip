@@ -1,8 +1,11 @@
-import type { TSESTree } from "@typescript-eslint/utils"
-import { AST_NODE_TYPES } from "@typescript-eslint/utils"
-import { ESLintUtils } from "@typescript-eslint/utils"
+import {
+  AST_NODE_TYPES,
+  ESLintUtils,
+  type TSESTree,
+} from "@typescript-eslint/utils"
+import type ts from "typescript"
+
 import * as tsutils from "ts-api-utils"
-import * as ts from "typescript"
 
 export type Options = []
 
@@ -144,21 +147,23 @@ export const rule = ESLintUtils.RuleCreator.withoutDocs<Options, MessageId>({
             visitExpression(node.body)
           }
           break
+        default:
+          break
       }
     }
 
     return {
       // Visit all top-level expressions
-      ExpressionStatement: visitNode,
-      VariableDeclarator: visitNode,
-      ReturnStatement: visitNode,
-      AssignmentExpression: visitNode,
-      ArrayExpression: visitNode,
-      ObjectExpression: visitNode,
-      ConditionalExpression: visitNode,
-      LogicalExpression: visitNode,
-      TemplateLiteral: visitNode,
-      ArrowFunctionExpression: visitNode,
+      ExpressionStatement: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      VariableDeclarator: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      ReturnStatement: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      AssignmentExpression: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      ArrayExpression: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      ObjectExpression: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      ConditionalExpression: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      LogicalExpression: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      TemplateLiteral: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
+      ArrowFunctionExpression: visitNode, // eslint-disable-line @typescript-eslint/naming-convention
     }
   },
 })

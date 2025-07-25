@@ -1,4 +1,4 @@
-const INVALID = Symbol("INVALID")
-const UNREACHABLE = Symbol("UNREACHABLE")
-export type Invalid = typeof INVALID
-export type Unreachable = typeof UNREACHABLE
+const _INVALID = Symbol("INVALID")
+const _UNREACHABLE = Symbol("UNREACHABLE")
+export type Invalid = typeof _INVALID
+export type Unreachable = typeof _UNREACHABLE

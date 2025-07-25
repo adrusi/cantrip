@@ -1,6 +1,7 @@
 import path from "node:path"
-import tseslint from "typescript-eslint"
 import { RuleTester } from "@typescript-eslint/rule-tester"
+import tseslint from "typescript-eslint"
+
 import * as vitest from "vitest"
 
 import { rule as awaitAllPromises } from "../src/mod"

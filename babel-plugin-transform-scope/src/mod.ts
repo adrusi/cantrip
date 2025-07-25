@@ -1,9 +1,10 @@
-import { declare } from "@babel/helper-plugin-utils"
 import { addNamed } from "@babel/helper-module-imports"
+import { declare } from "@babel/helper-plugin-utils"
 import { types as t } from "@babel/core"
-import type { Binding, NodePath } from "@babel/traverse"
 
-export default declare((api) => {
+import type { NodePath } from "@babel/traverse"
+
+export default declare((_api) => {
   const awaitHookImports: string[] = []
   const forAwaitHookImports: string[] = []
   const awaitUsingHookImports: string[] = []
@@ -45,6 +46,7 @@ export default declare((api) => {
     name: "transform-task-bound",
 
     visitor: {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       AwaitExpression(path) {
         const awaitHookIdent = getAwaitHookIdent(path)
         path.node.argument = t.callExpression(awaitHookIdent, [
@@ -52,6 +54,7 @@ export default declare((api) => {
         ])
       },
 
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       ForOfStatement(path) {
         if (path.node.await) {
           const forAwaitHookIdent = getForAwaitHookIdent(path)
@@ -60,6 +63,7 @@ export default declare((api) => {
         }
       },
 
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       VariableDeclaration(path) {
         if (path.node.kind === "await using") {
           const declaration = path.node.declarations[0]

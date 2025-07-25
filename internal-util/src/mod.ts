@@ -1,6 +1,6 @@
 export function brand<This>(
   _: undefined,
-  context: ClassFieldDecoratorContext<This, true> & {
+  _context: ClassFieldDecoratorContext<This, true> & {
     name: symbol
     static: false
     private: false
