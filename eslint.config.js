@@ -10,7 +10,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         tsconfigRootDir: import.meta.dirname,
-        project: ["./tsconfig.json", "./packages/*/tsconfig.json"],
+        project: ["./tsconfig.json", "./*/tsconfig.json"],
       },
     },
     linterOptions: {
@@ -100,7 +100,7 @@ export default tseslint.config(
         },
       ],
       "no-throw-literal": "off",
-      "@typescript-eslint/no-throw-literal": "error",
+      "@typescript-eslint/only-throw-error": "error",
       "@typescript-eslint/no-unnecessary-boolean-literal-compare": "error",
       "@typescript-eslint/no-unnecessary-condition": "off",
       "@typescript-eslint/no-unnecessary-qualifier": "error",

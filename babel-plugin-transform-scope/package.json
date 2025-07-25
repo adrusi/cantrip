@@ -1,5 +1,5 @@
 {
-  "name": "@cantrip/babel-plugin-transform-task-bound",
+  "name": "@cantrip/babel-plugin-transform-scope",
   "version": "0.1.0",
   "private": true,
   "type": "module",

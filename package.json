@@ -10,7 +10,7 @@
     "internal-util",
     "iter",
     "scope",
-    "babel-plugin-transform-task-bound"
+    "babel-plugin-transform-scope"
   ],
   "scripts": {
     "test": "jest",
@@ -23,13 +23,13 @@
     "@babel/preset-env": "^7.28.0",
     "@babel/preset-typescript": "^7.27.1",
     "@jest/globals": "^30.0.5",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
     "eslint": "^9.31.0",
     "eslint-config-prettier": "^9.1.2",
     "jest": "^30.0.5",
     "prettier": "^3.6.2",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^7.18.0"
+    "typescript-eslint": "^8.38.0"
   }
 }

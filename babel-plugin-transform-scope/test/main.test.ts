@@ -1,12 +1,18 @@
 import { expect, test } from "@jest/globals"
 
-import babel from "@babel/core"
+import * as babel from "@babel/core"
 // @ts-expect-error
 import ermSyntax from "@babel/plugin-syntax-explicit-resource-management"
 import plugin from "../src/mod"
 
 function transform(code: string): string | null | undefined {
-  return babel.transform(code, { plugins: [plugin, ermSyntax] })?.code
+  return babel.transformSync(code, {
+    filename: "example.ts",
+    plugins: [plugin, ermSyntax],
+    sourceType: "module",
+    configFile: false,
+    babelrc: false,
+  })?.code
 }
 
 function dedent(
@@ -35,55 +41,55 @@ function dedent(
 
 test("meow", () => {
   expect(transform(`await meow;`)).toBe(dedent`
-    import { Task as _Task } from "@cantrip/task";
-    await _Task.bound(meow);
+    import { awaitHook as _awaitHook } from "@cantrip/scope";
+    await _awaitHook(meow);
   `)
 
   expect(transform(`await ayy(await lmao);`)).toBe(dedent`
-    import { Task as _Task } from "@cantrip/task";
-    await _Task.bound(ayy(await _Task.bound(lmao)));
+    import { awaitHook as _awaitHook } from "@cantrip/scope";
+    await _awaitHook(ayy(await _awaitHook(lmao)));
   `)
 
   expect(transform(`for await (const x of y) {}`)).toBe(dedent`
-    import { Task as _Task } from "@cantrip/task";
-    for await (const x of _Task.bound(y)) {}
+    import { forAwaitHook as _forAwaitHook } from "@cantrip/scope";
+    for await (const x of _forAwaitHook(y)) {}
   `)
 
   expect(transform(`for await (const x of await y) {}`)).toBe(dedent`
-    import { Task as _Task } from "@cantrip/task";
-    for await (const x of _Task.bound(await _Task.bound(y))) {}
+    import { forAwaitHook as _forAwaitHook, awaitHook as _awaitHook } from "@cantrip/scope";
+    for await (const x of _forAwaitHook(await _awaitHook(y))) {}
   `)
 
   expect(transform(`await using foo = bar;`)).toBe(dedent`
-    import { Task as _Task } from "@cantrip/task";
-    await using foo = _Task.bound(bar);
+    import { awaitUsingHook as _awaitUsingHook } from "@cantrip/scope";
+    await using foo = _awaitUsingHook(bar);
   `)
 
   expect(
     transform(dedent`
-      const _Task = "nope";
+      const _awaitHook = "nope";
       await meow;
     `),
   ).toBe(dedent`
-    import { Task as _Task2 } from "@cantrip/task";
-    const _Task = "nope";
-    await _Task2.bound(meow);
+    import { awaitHook as _awaitHook2 } from "@cantrip/scope";
+    const _awaitHook = "nope";
+    await _awaitHook2(meow);
   `)
 
   expect(
     transform(dedent`
       await meow;
       async function ayy() {
-        const _Task = "nope";
+        const _awaitHook = "nope";
         await lmao;
       }
     `),
   ).toBe(dedent`
-    import { Task as _Task2 } from "@cantrip/task";
-    await _Task2.bound(meow);
+    import { awaitHook as _awaitHook2 } from "@cantrip/scope";
+    await _awaitHook2(meow);
     async function ayy() {
-      const _Task = "nope";
-      await _Task2.bound(lmao);
+      const _awaitHook = "nope";
+      await _awaitHook2(lmao);
     }
   `)
 })
