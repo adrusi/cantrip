@@ -168,26 +168,26 @@ export abstract class Iter<A>
 
   public flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
     return new (class extends Iter<B> {
-      readonly #aSrc: Iter<A>
-      #bSrc: Iterator<B> | null
+      private readonly aSrc: Iter<A>
+      private bSrc: Iterator<B> | null
 
       public constructor(src: Iter<A>) {
         super()
-        this.#aSrc = src
-        this.#bSrc = null
+        this.aSrc = src
+        this.bSrc = null
       }
 
       public next(): compat.IteratorResult<B> {
         while (true) {
-          if (this.#bSrc === null) {
-            const { done, value } = this.#aSrc.next()
+          if (this.bSrc === null) {
+            const { done, value } = this.aSrc.next()
             if (done) return { done: true, value: undefined }
 
-            this.#bSrc = asIterator(f(value))
+            this.bSrc = asIterator(f(value))
           }
 
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const { done, value } = this.#bSrc.next()
+          const { done, value } = this.bSrc.next()
           if (done) continue
 
           return { done: false, value }
@@ -195,7 +195,7 @@ export abstract class Iter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        let { min } = this.#aSrc.sizeBounds()
+        let { min } = this.aSrc.sizeBounds()
         return { min }
       }
     })(this)
@@ -203,23 +203,23 @@ export abstract class Iter<A>
 
   public filter(f: (a: A) => boolean): Iter<A> {
     return new (class extends Iter<A> {
-      readonly #src: Iter<A>
+      private readonly src: Iter<A>
 
       public constructor(src: Iter<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<A> {
         while (true) {
-          const { done, value } = this.#src.next()
+          const { done, value } = this.src.next()
           if (done) return { done: true, value: undefined }
           if (f(value)) return { done: false, value }
         }
       }
 
       public sizeBounds(): SizeBounds {
-        let { max } = this.#src.sizeBounds()
+        let { max } = this.src.sizeBounds()
         return { min: 0, max }
       }
     })(this)
@@ -227,22 +227,22 @@ export abstract class Iter<A>
 
   public take(n: number): Iter<A> {
     return new (class extends Iter<A> {
-      readonly #src: Iter<A>
-      #remaining: number
+      private readonly src: Iter<A>
+      private remaining: number
 
       public constructor(src: Iter<A>) {
         super()
-        this.#src = src
-        this.#remaining = n
+        this.src = src
+        this.remaining = n
       }
 
       public next(): compat.IteratorResult<A> {
-        if (this.#remaining <= 0) return { done: true, value: undefined }
-        this.#remaining -= 1
+        if (this.remaining <= 0) return { done: true, value: undefined }
+        this.remaining -= 1
 
-        const { done, value } = this.#src.next()
+        const { done, value } = this.src.next()
         if (done) {
-          this.#remaining = 0
+          this.remaining = 0
           return { done: true, value: undefined }
         }
 
@@ -250,11 +250,11 @@ export abstract class Iter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        let { min, max } = this.#src.sizeBounds()
+        let { min, max } = this.src.sizeBounds()
         return {
-          min: Math.min(min, this.#remaining),
+          min: Math.min(min, this.remaining),
           max:
-            max === undefined ? undefined : Math.max(max ?? 0, this.#remaining),
+            max === undefined ? undefined : Math.max(max ?? 0, this.remaining),
         }
       }
     })(this)
@@ -262,34 +262,34 @@ export abstract class Iter<A>
 
   public drop(n: number): Iter<A> {
     return new (class extends Iter<A> {
-      readonly #src: Iter<A>
-      #hasDropped: boolean
+      private readonly src: Iter<A>
+      private hasDropped: boolean
 
       public constructor(src: Iter<A>) {
         super()
-        this.#src = src
-        this.#hasDropped = false
+        this.src = src
+        this.hasDropped = false
       }
 
       public next(): compat.IteratorResult<A> {
-        if (!this.#hasDropped) {
+        if (!this.hasDropped) {
           for (let i = 0; i < n; i++) {
-            const { done } = this.#src.next()
+            const { done } = this.src.next()
             if (done) {
-              this.#hasDropped = true
+              this.hasDropped = true
               return { done: true, value: undefined }
             }
           }
 
-          this.#hasDropped = true
+          this.hasDropped = true
         }
 
-        return this.#src.next()
+        return this.src.next()
       }
 
       public sizeBounds(): SizeBounds {
-        if (this.#hasDropped) return this.#src.sizeBounds()
-        let { min, max } = this.#src.sizeBounds()
+        if (this.hasDropped) return this.src.sizeBounds()
+        let { min, max } = this.src.sizeBounds()
         return {
           min: Math.max(min - n, 0),
           max: max === undefined ? undefined : Math.max(max - n, 0),
@@ -300,21 +300,21 @@ export abstract class Iter<A>
 
   public chain<B>(bs: IterableOrIterator<B>): Iter<A | B> {
     return new (class extends Iter<A | B> {
-      #src: Iter<A> | Iter<B>
-      #nextSrc: Iter<B> | null
+      private src: Iter<A> | Iter<B>
+      private nextSrc: Iter<B> | null
 
       public constructor(aSrc: Iter<A>, bSrc: Iter<B>) {
         super()
-        this.#src = aSrc
-        this.#nextSrc = bSrc
+        this.src = aSrc
+        this.nextSrc = bSrc
       }
 
       public next(): compat.IteratorResult<A | B> {
-        const { done, value } = this.#src.next()
+        const { done, value } = this.src.next()
         if (done) {
-          if (this.#nextSrc) {
-            this.#src = this.#nextSrc
-            this.#nextSrc = null
+          if (this.nextSrc) {
+            this.src = this.nextSrc
+            this.nextSrc = null
             return this.next()
           }
 
@@ -325,10 +325,10 @@ export abstract class Iter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        if (!this.#nextSrc) return this.#src.sizeBounds()
+        if (!this.nextSrc) return this.src.sizeBounds()
 
-        let { min: aMin, max: aMax } = this.#src.sizeBounds()
-        let { min: bMin, max: bMax } = this.#nextSrc.sizeBounds()
+        let { min: aMin, max: aMax } = this.src.sizeBounds()
+        let { min: bMin, max: bMax } = this.nextSrc.sizeBounds()
         return {
           min: aMin + bMin,
           max:
@@ -363,19 +363,19 @@ export abstract class BackIter<A>
     it: compat.BackIterator<A>,
   ): BackIter<A> {
     return new (class extends BackIter<A> {
-      readonly #src: compat.BackIterator<A>
+      private readonly src: compat.BackIterator<A>
 
       public constructor(src: compat.BackIterator<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<A> {
-        return this.#src.next()
+        return this.src.next()
       }
 
       public nextBack(): compat.IteratorResult<A> {
-        return this.#src[compat.NEXT_BACK]()
+        return this.src[compat.NEXT_BACK]()
       }
 
       public sizeBounds(): SizeBounds {
@@ -440,16 +440,16 @@ export abstract class BackIter<A>
 
   public override filter(f: (a: A) => boolean): BackIter<A> {
     return new (class extends BackIter<A> {
-      readonly #src: BackIter<A>
+      private readonly src: BackIter<A>
 
       public constructor(src: BackIter<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<A> {
         while (true) {
-          const { done, value } = this.#src.next()
+          const { done, value } = this.src.next()
           if (done) return { done: true, value: undefined }
           if (f(value)) return { done: false, value }
         }
@@ -457,14 +457,14 @@ export abstract class BackIter<A>
 
       public nextBack(): compat.IteratorResult<A> {
         while (true) {
-          const { done, value } = this.#src.nextBack()
+          const { done, value } = this.src.nextBack()
           if (done) return { done: true, value: undefined }
           if (f(value)) return { done: false, value }
         }
       }
 
       public sizeBounds(): SizeBounds {
-        let { max } = this.#src.sizeBounds()
+        let { max } = this.src.sizeBounds()
         return { min: 0, max }
       }
     })(this)
@@ -491,24 +491,23 @@ export abstract class BackIter<A>
     }
 
     return new (class extends BackIter<A | B> {
-      #srcs: {
+      private srcs: {
         a: BackIter<A> | BackIter<B> | null
         b: BackIter<A> | BackIter<B> | null
       }
 
       public constructor(a: BackIter<A>, b: BackIter<B>) {
         super()
-        this.#srcs = { a, b }
+        this.srcs = { a, b }
       }
 
       public next(): compat.IteratorResult<A | B> {
-        let srcName: "a" | "b" = this.#srcs.a !== null ? "a" : "b"
-        if (this.#srcs[srcName] === null)
-          return { done: true, value: undefined }
+        let srcName: "a" | "b" = this.srcs.a !== null ? "a" : "b"
+        if (this.srcs[srcName] === null) return { done: true, value: undefined }
 
-        let { done, value } = this.#srcs[srcName].next()
+        let { done, value } = this.srcs[srcName].next()
         if (!done) {
-          this.#srcs[srcName] = null
+          this.srcs[srcName] = null
           return this.next()
         }
 
@@ -516,13 +515,12 @@ export abstract class BackIter<A>
       }
 
       public nextBack(): compat.IteratorResult<A | B> {
-        let srcName: "a" | "b" = this.#srcs.b === null ? "a" : "b"
-        if (this.#srcs[srcName] === null)
-          return { done: true, value: undefined }
+        let srcName: "a" | "b" = this.srcs.b === null ? "a" : "b"
+        if (this.srcs[srcName] === null) return { done: true, value: undefined }
 
-        let { done, value } = this.#srcs[srcName].nextBack()
+        let { done, value } = this.srcs[srcName].nextBack()
         if (!done) {
-          this.#srcs[srcName] = null
+          this.srcs[srcName] = null
           return this.next()
         }
 
@@ -530,15 +528,15 @@ export abstract class BackIter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        if (this.#srcs.a === null && this.#srcs.b === null) {
+        if (this.srcs.a === null && this.srcs.b === null) {
           return { min: 0, max: 0 }
-        } else if (this.#srcs.a !== null && this.#srcs.b === null) {
-          return this.#srcs.a.sizeBounds()
-        } else if (this.#srcs.a === null && this.#srcs.b !== null) {
-          return this.#srcs.b.sizeBounds()
-        } else if (this.#srcs.a !== null && this.#srcs.b !== null) {
-          let { min: aMin, max: aMax } = this.#srcs.a.sizeBounds()
-          let { min: bMin, max: bMax } = this.#srcs.b.sizeBounds()
+        } else if (this.srcs.a !== null && this.srcs.b === null) {
+          return this.srcs.a.sizeBounds()
+        } else if (this.srcs.a === null && this.srcs.b !== null) {
+          return this.srcs.b.sizeBounds()
+        } else if (this.srcs.a !== null && this.srcs.b !== null) {
+          let { min: aMin, max: aMax } = this.srcs.a.sizeBounds()
+          let { min: bMin, max: bMax } = this.srcs.b.sizeBounds()
           return {
             min: aMin + bMin,
             max:
@@ -557,23 +555,23 @@ export abstract class BackIter<A>
 
   public reversed(): BackIter<A> {
     return new (class extends BackIter<A> {
-      readonly #src: BackIter<A>
+      private readonly src: BackIter<A>
 
       public constructor(src: BackIter<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<A> {
-        return this.#src.nextBack()
+        return this.src.nextBack()
       }
 
       public nextBack(): compat.IteratorResult<A> {
-        return this.#src.next()
+        return this.src.next()
       }
 
       public sizeBounds(): SizeBounds {
-        return this.#src.sizeBounds()
+        return this.src.sizeBounds()
       }
     })(this)
   }
@@ -601,62 +599,62 @@ export abstract class SizeIter<A>
     it: compat.SizeIterator<A>,
   ): SizeIter<A> {
     return new (class extends SizeIter<A> {
-      readonly #src: compat.SizeIterator<A>
+      private readonly src: compat.SizeIterator<A>
 
       public constructor(src: compat.SizeIterator<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<A> {
-        return this.#src.next()
+        return this.src.next()
       }
 
       public size(): number {
-        return this.#src[compat.SIZE]()
+        return this.src[compat.SIZE]()
       }
     })(it)
   }
 
   public override map<B>(f: (a: A) => B): SizeIter<B> {
     return new (class extends SizeIter<B> {
-      readonly #src: SizeIter<A>
+      private readonly src: SizeIter<A>
 
       public constructor(src: SizeIter<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<B> {
-        const { done, value } = this.#src.next()
+        const { done, value } = this.src.next()
         if (done) return { done: true, value: undefined }
         return { done: false, value: f(value) }
       }
 
       public size(): number {
-        return this.#src.size()
+        return this.src.size()
       }
     })(this)
   }
 
   public override take(n: number): SizeIter<A> {
     return new (class extends SizeIter<A> {
-      readonly #src: SizeIter<A>
-      #remaining: number
+      private readonly src: SizeIter<A>
+      private remaining: number
 
       public constructor(src: SizeIter<A>) {
         super()
-        this.#src = src
-        this.#remaining = n
+        this.src = src
+        this.remaining = n
       }
 
       public next(): compat.IteratorResult<A> {
-        if (this.#remaining <= 0) return { done: true, value: undefined }
-        this.#remaining -= 1
+        if (this.remaining <= 0) return { done: true, value: undefined }
+        this.remaining -= 1
 
-        const { done, value } = this.#src.next()
+        const { done, value } = this.src.next()
         if (done) {
-          this.#remaining = 0
+          this.remaining = 0
           return { done: true, value: undefined }
         }
 
@@ -664,41 +662,41 @@ export abstract class SizeIter<A>
       }
 
       public size(): number {
-        return Math.min(this.#src.size(), this.#remaining)
+        return Math.min(this.src.size(), this.remaining)
       }
     })(this)
   }
 
   public override drop(n: number): SizeIter<A> {
     return new (class extends SizeIter<A> {
-      readonly #src: SizeIter<A>
-      #hasDropped: boolean
+      private readonly src: SizeIter<A>
+      private hasDropped: boolean
 
       public constructor(src: SizeIter<A>) {
         super()
-        this.#src = src
-        this.#hasDropped = false
+        this.src = src
+        this.hasDropped = false
       }
 
       public next(): compat.IteratorResult<A> {
-        if (!this.#hasDropped) {
+        if (!this.hasDropped) {
           for (let i = 0; i < n; i++) {
-            const { done } = this.#src.next()
+            const { done } = this.src.next()
             if (done) {
-              this.#hasDropped = true
+              this.hasDropped = true
               return { done: true, value: undefined }
             }
           }
 
-          this.#hasDropped = true
+          this.hasDropped = true
         }
 
-        return this.#src.next()
+        return this.src.next()
       }
 
       public size(): number {
-        if (this.#hasDropped) return this.#src.size()
-        return Math.max(this.#src.size() - n, 0)
+        if (this.hasDropped) return this.src.size()
+        return Math.max(this.src.size() - n, 0)
       }
     })(this)
   }
@@ -717,21 +715,21 @@ export abstract class SizeIter<A>
       return super.chain(bs)
     }
     return new (class extends SizeIter<A | B> {
-      #src: SizeIter<A> | SizeIter<B>
-      #nextSrc: SizeIter<B> | null
+      private src: SizeIter<A> | SizeIter<B>
+      private nextSrc: SizeIter<B> | null
 
       public constructor(aSrc: SizeIter<A>, bSrc: SizeIter<B>) {
         super()
-        this.#src = aSrc
-        this.#nextSrc = bSrc
+        this.src = aSrc
+        this.nextSrc = bSrc
       }
 
       public next(): compat.IteratorResult<A | B> {
-        const { done, value } = this.#src.next()
+        const { done, value } = this.src.next()
         if (done) {
-          if (this.#nextSrc) {
-            this.#src = this.#nextSrc
-            this.#nextSrc = null
+          if (this.nextSrc) {
+            this.src = this.nextSrc
+            this.nextSrc = null
             return this.next()
           }
 
@@ -742,8 +740,8 @@ export abstract class SizeIter<A>
       }
 
       public size(): number {
-        if (!this.#nextSrc) return this.#src.size()
-        return this.#src.size() + this.#nextSrc.size()
+        if (!this.nextSrc) return this.src.size()
+        return this.src.size() + this.nextSrc.size()
       }
     })(this, Iter.from(bs as compat.SizeIterable<B> | compat.SizeIterator<B>))
   }
@@ -784,50 +782,50 @@ export abstract class BackSizeIter<A>
     it: compat.BackSizeIterator<A>,
   ): BackSizeIter<A> {
     return new (class extends BackSizeIter<A> {
-      readonly #src: compat.BackSizeIterator<A>
+      private readonly src: compat.BackSizeIterator<A>
 
       public constructor(src: compat.BackSizeIterator<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<A> {
-        return this.#src.next()
+        return this.src.next()
       }
 
       public nextBack(): compat.IteratorResult<A> {
-        return this.#src[compat.NEXT_BACK]()
+        return this.src[compat.NEXT_BACK]()
       }
 
       public size(): number {
-        return this.#src[compat.SIZE]()
+        return this.src[compat.SIZE]()
       }
     })(it)
   }
 
   public override map<B>(f: (a: A) => B): BackSizeIter<B> {
     return new (class extends BackSizeIter<B> {
-      readonly #src: BackSizeIter<A>
+      private readonly src: BackSizeIter<A>
 
       public constructor(src: BackSizeIter<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<B> {
-        const { done, value } = this.#src.next()
+        const { done, value } = this.src.next()
         if (done) return { done: true, value: undefined }
         return { done: false, value: f(value) }
       }
 
       public nextBack(): compat.IteratorResult<B> {
-        const { done, value } = this.#src.nextBack()
+        const { done, value } = this.src.nextBack()
         if (done) return { done: true, value: undefined }
         return { done: false, value: f(value) }
       }
 
       public size(): number {
-        return this.#src.size()
+        return this.src.size()
       }
     })(this)
   }
@@ -890,24 +888,23 @@ export abstract class BackSizeIter<A>
     }
 
     return new (class extends BackSizeIter<A | B> {
-      #srcs: {
+      private srcs: {
         a: BackSizeIter<A> | BackSizeIter<B> | null
         b: BackSizeIter<A> | BackSizeIter<B> | null
       }
 
       public constructor(a: BackSizeIter<A>, b: BackSizeIter<B>) {
         super()
-        this.#srcs = { a, b }
+        this.srcs = { a, b }
       }
 
       public next(): compat.IteratorResult<A | B> {
-        let srcName: "a" | "b" = this.#srcs.a !== null ? "a" : "b"
-        if (this.#srcs[srcName] === null)
-          return { done: true, value: undefined }
+        let srcName: "a" | "b" = this.srcs.a !== null ? "a" : "b"
+        if (this.srcs[srcName] === null) return { done: true, value: undefined }
 
-        let { done, value } = this.#srcs[srcName].next()
+        let { done, value } = this.srcs[srcName].next()
         if (!done) {
-          this.#srcs[srcName] = null
+          this.srcs[srcName] = null
           return this.next()
         }
 
@@ -915,13 +912,12 @@ export abstract class BackSizeIter<A>
       }
 
       public nextBack(): compat.IteratorResult<A | B> {
-        let srcName: "a" | "b" = this.#srcs.b === null ? "a" : "b"
-        if (this.#srcs[srcName] === null)
-          return { done: true, value: undefined }
+        let srcName: "a" | "b" = this.srcs.b === null ? "a" : "b"
+        if (this.srcs[srcName] === null) return { done: true, value: undefined }
 
-        let { done, value } = this.#srcs[srcName].nextBack()
+        let { done, value } = this.srcs[srcName].nextBack()
         if (!done) {
-          this.#srcs[srcName] = null
+          this.srcs[srcName] = null
           return this.next()
         }
 
@@ -929,14 +925,14 @@ export abstract class BackSizeIter<A>
       }
 
       public size(): number {
-        if (this.#srcs.a === null && this.#srcs.b === null) {
+        if (this.srcs.a === null && this.srcs.b === null) {
           return 0
-        } else if (this.#srcs.a !== null && this.#srcs.b === null) {
-          return this.#srcs.a.size()
-        } else if (this.#srcs.a === null && this.#srcs.b !== null) {
-          return this.#srcs.b.size()
-        } else if (this.#srcs.a !== null && this.#srcs.b !== null) {
-          return this.#srcs.a.size() + this.#srcs.b.size()
+        } else if (this.srcs.a !== null && this.srcs.b === null) {
+          return this.srcs.a.size()
+        } else if (this.srcs.a === null && this.srcs.b !== null) {
+          return this.srcs.b.size()
+        } else if (this.srcs.a !== null && this.srcs.b !== null) {
+          return this.srcs.a.size() + this.srcs.b.size()
         } else {
           throw new Error("unreachable")
         }
@@ -953,23 +949,23 @@ export abstract class BackSizeIter<A>
 
   public reversed(): BackSizeIter<A> {
     return new (class extends BackSizeIter<A> {
-      readonly #src: BackSizeIter<A>
+      private readonly src: BackSizeIter<A>
 
       public constructor(src: BackSizeIter<A>) {
         super()
-        this.#src = src
+        this.src = src
       }
 
       public next(): compat.IteratorResult<A> {
-        return this.#src.nextBack()
+        return this.src.nextBack()
       }
 
       public nextBack(): compat.IteratorResult<A> {
-        return this.#src.next()
+        return this.src.next()
       }
 
       public size(): number {
-        return this.#src.size()
+        return this.src.size()
       }
     })(this)
   }

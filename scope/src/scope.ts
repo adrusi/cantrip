@@ -10,11 +10,12 @@ const SCOPE_ON_COMPLETE = Symbol("SCOPE_ON_COMPLETE")
 const SCOPE_ERRORS = Symbol("SCOPE_ERRORS")
 
 export class Scope {
-  #halted: boolean = false
+  private halted: boolean = false
 
-  readonly #completeListeners: Set<() => void> = new Set()
-  readonly #procs: Set<Promise<void>> = new Set()
-  readonly #haltListeners: Set<(error: InterruptError) => void> = new Set()
+  private readonly completeListeners: Set<() => void> = new Set()
+  private readonly procs: Set<Promise<void>> = new Set()
+  private readonly haltListeners: Set<(error: InterruptError) => void> =
+    new Set()
 
   public [SCOPE_ERRORS]: Set<unknown> = new Set()
 
@@ -30,12 +31,12 @@ export class Scope {
     currentScope = this
     let p = callback()
     currentScope = callingScope
-    this.#procs.add(p)
+    this.procs.add(p)
     p.then(() => {
-      this.#procs.delete(p)
+      this.procs.delete(p)
       this[SCOPE_NOTIFY]()
     }).catch((error) => {
-      this.#procs.delete(p)
+      this.procs.delete(p)
       this[SCOPE_NOTIFY](error)
     })
   }
@@ -43,9 +44,9 @@ export class Scope {
   public halt(): void {
     let interrupt = new InterruptError("Scope halted")
 
-    if (!this.#halted) {
-      this.#halted = true
-      for (let callback of this.#haltListeners) {
+    if (!this.halted) {
+      this.halted = true
+      for (let callback of this.haltListeners) {
         callback(interrupt)
       }
     }
@@ -63,23 +64,23 @@ export class Scope {
       }
     }
 
-    if (this.#procs.size === 0) {
-      for (let callback of this.#completeListeners) {
+    if (this.procs.size === 0) {
+      for (let callback of this.completeListeners) {
         callback()
       }
     }
   }
 
   public [SCOPE_ON_HALT](callback: (error: InterruptError) => void): void {
-    this.#haltListeners.add(callback)
+    this.haltListeners.add(callback)
   }
 
   public [SCOPE_OFF_HALT](callback: (error: InterruptError) => void): void {
-    this.#haltListeners.delete(callback)
+    this.haltListeners.delete(callback)
   }
 
   public [SCOPE_ON_COMPLETE](callback: () => void): void {
-    this.#completeListeners.add(callback)
+    this.completeListeners.add(callback)
   }
 }
 
@@ -153,7 +154,7 @@ export function forAwaitHook<A, Return = unknown, Next = unknown>(
 class HookedAsyncIterator<A, Return, Next>
   implements AsyncIterator<A, Return, Next>
 {
-  readonly #iter: AsyncIterator<A, Return, Next>
+  private readonly iter: AsyncIterator<A, Return, Next>
 
   public return?: (
     value?: Return | PromiseLike<Return> | undefined,
@@ -162,7 +163,7 @@ class HookedAsyncIterator<A, Return, Next>
   public throw?: (e?: unknown) => Promise<IteratorResult<A, Return>>
 
   public constructor(iter: AsyncIterator<A, Return, Next>) {
-    this.#iter = iter
+    this.iter = iter
 
     if (typeof iter.return === "function") {
       this.return = async (
@@ -182,7 +183,7 @@ class HookedAsyncIterator<A, Return, Next>
   }
 
   public async next(...args: [] | [Next]): Promise<IteratorResult<A, Return>> {
-    return await awaitHook(this.#iter.next(...args))
+    return await awaitHook(this.iter.next(...args))
   }
 }
 

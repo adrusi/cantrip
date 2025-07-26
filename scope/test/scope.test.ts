@@ -18,22 +18,22 @@ function timeout(millis: number): Promise<never> {
 }
 
 class Checkpoint implements PromiseLike<unknown> {
-  readonly #name: string
-  #resolve?: (value?: unknown) => void
-  #reject?: (reason?: unknown) => void
-  #isAwaited = false
-  #isResolved = false
-  readonly #promise: Promise<void>
+  private readonly name_: string
+  private resolve_?: (value?: unknown) => void
+  private reject_?: (reason?: unknown) => void
+  private isAwaited_ = false
+  private isResolved_ = false
+  private readonly promise: Promise<void>
 
   public constructor(name: string) {
-    this.#name = name
-    this.#promise = new Promise((resolve, reject) => {
-      this.#resolve = (_value) => {
-        this.#isResolved = true
+    this.name_ = name
+    this.promise = new Promise((resolve, reject) => {
+      this.resolve_ = (_value) => {
+        this.isResolved_ = true
         resolve(undefined)
       }
-      this.#reject = (reason) => {
-        this.#isResolved = true
+      this.reject_ = (reason) => {
+        this.isResolved_ = true
         // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
         reject(reason)
       }
@@ -41,29 +41,29 @@ class Checkpoint implements PromiseLike<unknown> {
   }
 
   public get name(): string {
-    return this.#name
+    return this.name_
   }
 
   public get isAwaited(): boolean {
-    return this.#isAwaited
+    return this.isAwaited_
   }
 
   public get isResolved(): boolean {
-    return this.#isResolved
+    return this.isResolved_
   }
 
   public resolve(value?: unknown): void {
-    if (this.#isResolved) {
-      throw new Error(`Checkpoint '${this.#name}' already resolved`)
+    if (this.isResolved_) {
+      throw new Error(`Checkpoint '${this.name_}' already resolved`)
     }
-    this.#resolve!(value) // eslint-disable-line @typescript-eslint/no-non-null-assertion
+    this.resolve_!(value) // eslint-disable-line @typescript-eslint/no-non-null-assertion
   }
 
   public reject(reason?: unknown): void {
-    if (this.#isResolved) {
-      throw new Error(`Checkpoint '${this.#name}' already resolved`)
+    if (this.isResolved_) {
+      throw new Error(`Checkpoint '${this.name_}' already resolved`)
     }
-    this.#reject!(reason) // eslint-disable-line @typescript-eslint/no-non-null-assertion
+    this.reject_!(reason) // eslint-disable-line @typescript-eslint/no-non-null-assertion
   }
 
   // eslint-disable-next-line @typescript-eslint/promise-function-async
@@ -71,25 +71,25 @@ class Checkpoint implements PromiseLike<unknown> {
     onfulfilled?: (value: unknown) => T1 | PromiseLike<T1>,
     onrejected?: (reason: unknown) => T2 | PromiseLike<T2>,
   ): Promise<T1 | T2> {
-    this.#isAwaited = true
-    return this.#promise.then(onfulfilled, onrejected)
+    this.isAwaited_ = true
+    return this.promise.then(onfulfilled, onrejected)
   }
 }
 
 class TestController {
-  readonly #checkpoints: Map<string, Checkpoint> = new Map()
+  private readonly checkpoints: Map<string, Checkpoint> = new Map()
 
   public checkpoint(name: string): Checkpoint {
-    if (this.#checkpoints.has(name)) {
+    if (this.checkpoints.has(name)) {
       throw new Error(`Checkpoint '${name}' already exists`)
     }
     const chk = new Checkpoint(name)
-    this.#checkpoints.set(name, chk)
+    this.checkpoints.set(name, chk)
     return chk
   }
 
   public getCheckpoint(name: string): Checkpoint {
-    const chk = this.#checkpoints.get(name)
+    const chk = this.checkpoints.get(name)
     if (!chk) throw new Error(`Checkpoint '${name}' not found`)
     return chk
   }

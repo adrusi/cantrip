@@ -44,54 +44,54 @@ export class NumBufArr<
   const Axes extends string,
 > implements Arr<dtype.Js<DType>, Axes[number]>
 {
-  readonly #mutable: boolean
-  readonly #dtype: DType
-  readonly #buffer: ArrayBuffer
-  readonly #dims: Readonly<Record<Axes, number>>
-  readonly #offsets: Readonly<Record<Axes, number>>
-  readonly #strides: Readonly<Record<Axes, number>>
+  private readonly mutable_: boolean
+  private readonly dtype_: DType
+  private readonly buffer_: ArrayBuffer
+  private readonly dims_: Readonly<Record<Axes, number>>
+  private readonly offsets_: Readonly<Record<Axes, number>>
+  private readonly strides_: Readonly<Record<Axes, number>>
 
   public get mutable(): boolean {
-    return this.#mutable
+    return this.mutable_
   }
 
   public get dtype(): DType {
-    return this.#dtype
+    return this.dtype_
   }
 
   public get buffer(): ArrayBuffer {
-    return this.#buffer
+    return this.buffer_
   }
 
   public get axes(): Readonly<Permutations<UnionToTuple<Axes>>> {
     let result = []
-    for (let axis in this.#dims) result.push(axis)
+    for (let axis in this.dims_) result.push(axis)
     return frozenTuple(result) as unknown as Readonly<
       Permutations<UnionToTuple<Axes>>
     >
   }
 
   public get dims(): Readonly<Record<Axes, number>> {
-    return this.#dims
+    return this.dims_
   }
 
   public get offsets(): Readonly<Record<Axes, number>> {
-    return this.#offsets
+    return this.offsets_
   }
 
   public get bounds(): Readonly<Record<Axes, [number, number]>> {
     let result: Partial<Readonly<Record<Axes, [number, number]>>> = {}
-    for (let axis in this.#dims) {
+    for (let axis in this.dims_) {
       result[axis] = [
-        0 + this.#offsets[axis],
-        this.#dims[axis] + this.#offsets[axis] - 1,
+        0 + this.offsets_[axis],
+        this.dims_[axis] + this.offsets_[axis] - 1,
       ]
     }
     return result as Readonly<Record<Axes, [number, number]>>
   }
 
   public get strides(): Readonly<Record<Axes, number>> {
-    return this.#strides
+    return this.strides_
   }
 
   private constructor(
@@ -118,12 +118,12 @@ export class NumBufArr<
       )
     }
 
-    this.#mutable = mutable
-    this.#dtype = dtype
-    this.#buffer = buffer
-    this.#dims = Object.freeze({ ...dims })
-    this.#offsets = Object.freeze({ ...offsets })
-    this.#strides = Object.freeze({ ...strides })
+    this.mutable_ = mutable
+    this.dtype_ = dtype
+    this.buffer_ = buffer
+    this.dims_ = Object.freeze({ ...dims })
+    this.offsets_ = Object.freeze({ ...offsets })
+    this.strides_ = Object.freeze({ ...strides })
   }
 
   public static zeros<
