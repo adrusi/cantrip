@@ -25,8 +25,6 @@ export type IterFromReturn<It extends IterableOrIterator<unknown>> = It extends
         ? Iter<A>
         : never
 
-// export type IterFrom
-
 function asIterator<A>(src: IterableOrIterator<A>): Iterator<A> {
   if (compat.isIterable(src)) return src[compat.ITERATOR]()
   if (compat.isStdIterable(src)) return src[Symbol.iterator]()
