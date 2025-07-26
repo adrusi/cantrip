@@ -1,6 +1,9 @@
 import * as compat from "@cantrip/compat/iter/async"
 
-type SizeBounds = [number, number | undefined]
+type SizeBounds = {
+  readonly min: number
+  readonly max?: number
+}
 
 export type IterableOrIterator<A> =
   | compat.Iterable<A>
@@ -86,7 +89,7 @@ export abstract class AsyncIter<A> implements compat.Iterator<A> {
       }
 
       public sizeBounds(): SizeBounds {
-        return [0, undefined]
+        return { min: 0 }
       }
     })()
   }
@@ -104,7 +107,7 @@ export abstract class AsyncIter<A> implements compat.Iterator<A> {
       }
 
       public sizeBounds(): SizeBounds {
-        return [0, undefined]
+        return { min: 0 }
       }
     })()
   }
@@ -140,7 +143,7 @@ export abstract class AsyncIter<A> implements compat.Iterator<A> {
       }
 
       public sizeBounds(): SizeBounds {
-        return [0, 0]
+        return { min: 0, max: 0 }
       }
     })()
   }
@@ -186,7 +189,7 @@ export abstract class AsyncIter<A> implements compat.Iterator<A> {
       }
 
       public sizeBounds(): SizeBounds {
-        return [0, undefined]
+        return { min: 0 }
       }
     })(this)
   }
@@ -209,8 +212,8 @@ export abstract class AsyncIter<A> implements compat.Iterator<A> {
       }
 
       public sizeBounds(): SizeBounds {
-        const [lower] = this.src.sizeBounds()
-        return [0, lower]
+        const { max } = this.src.sizeBounds()
+        return { min: 0, max }
       }
     })(this)
   }
@@ -239,11 +242,11 @@ export abstract class AsyncIter<A> implements compat.Iterator<A> {
       }
 
       public sizeBounds(): SizeBounds {
-        const [lower, upper] = this.src.sizeBounds()
-        return [
-          Math.min(lower, n),
-          upper === undefined ? n : Math.min(upper, n),
-        ]
+        const { min, max } = this.src.sizeBounds()
+        return {
+          min: Math.min(min, n),
+          max: max == null ? n : Math.min(max, n),
+        }
       }
     })(this)
   }
@@ -271,11 +274,11 @@ export abstract class AsyncIter<A> implements compat.Iterator<A> {
       }
 
       public sizeBounds(): SizeBounds {
-        const [lower, upper] = this.src.sizeBounds()
-        return [
-          Math.max(0, lower - n),
-          upper === undefined ? undefined : Math.max(0, upper - n),
-        ]
+        const { min, max } = this.src.sizeBounds()
+        return {
+          min: Math.max(0, min - n),
+          max: max === undefined ? undefined : Math.max(0, max - n),
+        }
       }
     })(this)
   }
@@ -306,15 +309,13 @@ export abstract class AsyncIter<A> implements compat.Iterator<A> {
       }
 
       public sizeBounds(): SizeBounds {
-        const [aLower, aUpper] = this.src.sizeBounds()
+        const { min: amin, max: amax } = this.src.sizeBounds()
         const otherIter = AsyncIter.from(other)
-        const [bLower, bUpper] = otherIter.sizeBounds()
-        return [
-          aLower + bLower,
-          aUpper === undefined || bUpper === undefined
-            ? undefined
-            : aUpper + bUpper,
-        ]
+        const { min: bmin, max: bmax } = otherIter.sizeBounds()
+        return {
+          min: amin + bmin,
+          max: amax == null || bmax == null ? undefined : amax + bmax,
+        }
       }
     })(this)
   }
@@ -363,7 +364,7 @@ export abstract class BackAsyncIter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        return [0, undefined]
+        return { min: 0 }
       }
     })()
   }
@@ -427,8 +428,8 @@ export abstract class BackAsyncIter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        const [lower] = this.src.sizeBounds()
-        return [0, lower]
+        const { max } = this.src.sizeBounds()
+        return { min: 0, max }
       }
     })(this)
   }
@@ -463,14 +464,12 @@ export abstract class BackAsyncIter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        const [aLower, aUpper] = this.srcs[0].sizeBounds()
-        const [bLower, bUpper] = this.srcs[1].sizeBounds()
-        return [
-          aLower + bLower,
-          aUpper === undefined || bUpper === undefined
-            ? undefined
-            : aUpper + bUpper,
-        ]
+        const { min: amin, max: amax } = this.srcs[0].sizeBounds()
+        const { min: bmin, max: bmax } = this.srcs[1].sizeBounds()
+        return {
+          min: amin + bmin,
+          max: amax == null || bmax == null ? undefined : amax + bmax,
+        }
       }
     })(this)
   }
@@ -647,7 +646,7 @@ export abstract class SizeAsyncIter<A>
 
   public override sizeBounds(): SizeBounds {
     const size = this.size()
-    return [size, size]
+    return { min: size, max: size }
   }
 }
 
@@ -791,7 +790,7 @@ export abstract class BackSizeAsyncIter<A>
 
   public override sizeBounds(): SizeBounds {
     const size = this.size()
-    return [size, size]
+    return { min: size, max: size }
   }
 
   public override reversed(): BackSizeAsyncIter<A> {
