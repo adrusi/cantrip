@@ -23,7 +23,7 @@
     "test:eslint-rule:watch": "npm run test:watch -w typescript-eslint-rule-await-all-promises",
     "test:coverage": "vitest run --coverage",
     "build": "npm run build --workspaces --if-present",
-    "clean": "npm run clean --workspaces --if-present",
+    "clean": "rm -rf coverage && npm run clean --workspaces --if-present",
     "typecheck": "npm run tsc --workspaces --if-present",
     "lint": "eslint .",
     "format": "prettier --write .",

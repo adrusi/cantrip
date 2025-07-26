@@ -4,7 +4,6 @@
 }:
 pkgs.mkShell {
   nativeBuildInputs = [
-    pkgs.bun
     pkgs.nodejs
   ];
 

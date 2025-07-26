@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest"
 
-import { withScope, awaitHook } from "./scope"
+import { withScope, awaitHook } from "../src/scope"
 
 // eslint-disable-next-line @typescript-eslint/promise-function-async
 function nextTick(): Promise<void> {

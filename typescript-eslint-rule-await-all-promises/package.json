@@ -10,13 +10,12 @@
   "main": "lib/mod.js",
   "types": "lib/mod.d.ts",
   "scripts": {
-    "test": "vitest --run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "build": "tsc",
     "clean": "rm -rf lib",
     "dev": "npm run test:watch",
-    "typecheck": "tsc --noEmit",
-    "tsc": "tsc"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@typescript-eslint/utils": "^8.38.0",
