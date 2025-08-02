@@ -49,6 +49,7 @@ export interface SizeIterator<A> extends CompatIterator<A> {
 export interface BackSizeIterator<A> extends BackIterator<A>, SizeIterator<A> {}
 
 export function isStdIterable(it: unknown): it is Iterable<unknown> {
+  if (typeof it === "string") return true
   return (
     typeof it === "object" &&
     it !== null &&
@@ -58,12 +59,14 @@ export function isStdIterable(it: unknown): it is Iterable<unknown> {
 }
 
 export function isIterable(it: unknown): it is CompatIterable<unknown> {
+  if (typeof it === "string") it = new String(it)
   return (
     isStdIterable(it) && ITERATOR in it && typeof it[ITERATOR] === "function"
   )
 }
 
 export function isBackIterable(it: unknown): it is BackIterable<unknown> {
+  if (typeof it === "string") it = new String(it)
   return (
     isIterable(it) &&
     IS_BACK_ITERABLE in it &&
@@ -73,6 +76,7 @@ export function isBackIterable(it: unknown): it is BackIterable<unknown> {
 }
 
 export function isSizeIterable(it: unknown): it is SizeIterable<unknown> {
+  if (typeof it === "string") it = new String(it)
   return (
     isIterable(it) &&
     IS_SIZE_ITERABLE in it &&

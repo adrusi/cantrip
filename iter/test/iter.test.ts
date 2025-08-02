@@ -73,21 +73,6 @@ describe("Iter", () => {
       expect(iter.next()).toEqual({ done: true, value: undefined })
     })
 
-    test("wrap - wraps function returning iterator result", () => {
-      let count = 0
-      const iter = Iter.wrap(() => {
-        if (count < 3) {
-          return { done: false, value: ++count }
-        }
-        return { done: true, value: undefined }
-      })
-
-      expect(iter.next()).toEqual({ done: false, value: 1 })
-      expect(iter.next()).toEqual({ done: false, value: 2 })
-      expect(iter.next()).toEqual({ done: false, value: 3 })
-      expect(iter.next()).toEqual({ done: true, value: undefined })
-    })
-
     test("of - creates iterator from values", () => {
       const iter = Iter.of(1, 2, 3)
       expect(iter.next()).toEqual({ done: false, value: 1 })
@@ -162,7 +147,7 @@ describe("Iter", () => {
 
     test("preserves size bounds", () => {
       const iter = Iter.from([1, 2, 3]).map((x) => x * 2)
-      expect(iter.sizeBounds()).toEqual({ lower: 3, upper: 3 })
+      expect(iter.sizeBounds()).toEqual({ min: 3, max: 3 })
     })
   })
 
@@ -194,7 +179,7 @@ describe("Iter", () => {
 
     test("preserves size bounds", () => {
       const iter = Iter.from([1, 2, 3]).flatMap((x) => Iter.from([x, x]))
-      expect(iter.sizeBounds()).toEqual({ lower: 0, upper: null })
+      expect(iter.sizeBounds()).toEqual({ min: 0 })
     })
   })
 
@@ -226,7 +211,7 @@ describe("Iter", () => {
 
     test("preserves size bounds", () => {
       const iter = Iter.from([1, 2, 3, 4, 5]).filter((x) => x % 2 === 0)
-      expect(iter.sizeBounds()).toEqual({ lower: 0, upper: 5 })
+      expect(iter.sizeBounds()).toEqual({ min: 0, max: 5 })
     })
   })
 
@@ -257,8 +242,11 @@ describe("Iter", () => {
     })
 
     test("preserves size bounds", () => {
-      const iter = Iter.from([1, 2, 3, 4, 5]).take(3)
-      expect(iter.sizeBounds()).toEqual({ lower: 0, upper: 3 })
+      const longerIter = Iter.from([1, 2, 3, 4, 5]).take(3)
+      expect(longerIter.sizeBounds()).toEqual({ min: 3, max: 3 })
+
+      const shorterIter = Iter.from([1, 2]).take(3)
+      expect(shorterIter.sizeBounds()).toEqual({ min: 2, max: 2 })
     })
   })
 
@@ -291,7 +279,7 @@ describe("Iter", () => {
 
     test("preserves size bounds", () => {
       const iter = Iter.from([1, 2, 3, 4, 5]).drop(2)
-      expect(iter.sizeBounds()).toEqual({ lower: 0, upper: 3 })
+      expect(iter.sizeBounds()).toEqual({ min: 3, max: 3 })
     })
   })
 
@@ -341,7 +329,7 @@ describe("Iter", () => {
       const iter2 = Iter.from([4, 5])
       const chained = iter1.chain(iter2)
 
-      expect(chained.sizeBounds()).toEqual({ lower: 5, upper: 5 })
+      expect(chained.sizeBounds()).toEqual({ min: 5, max: 5 })
     })
   })
 

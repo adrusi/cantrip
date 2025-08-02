@@ -41,11 +41,17 @@ export abstract class Iter<A>
   public abstract next(): compat.IteratorResult<A>
 
   public return(_value?: unknown): { done: true; value: undefined } {
+    this.next = () => {
+      return { done: true, value: undefined }
+    }
     return { done: true, value: undefined }
   }
 
-  public throw(_e?: unknown): { done: true; value: undefined } {
-    return { done: true, value: undefined }
+  public throw(e?: unknown): { done: true; value: undefined } {
+    this.next = () => {
+      return { done: true, value: undefined }
+    }
+    throw e
   }
 
   public [compat.ITERATOR](): this {
@@ -193,8 +199,7 @@ export abstract class Iter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        let { min } = this.aSrc.sizeBounds()
-        return { min }
+        return { min: 0 }
       }
     })(this)
   }
@@ -357,6 +362,25 @@ export abstract class BackIter<A>
     return this.nextBack()
   }
 
+  public override return(value?: unknown): { done: true; value: undefined } {
+    const result = super.return(value)
+    this.nextBack = () => {
+      return { done: true, value: undefined }
+    }
+    return result
+  }
+
+  public override throw(value?: unknown): { done: true; value: undefined } {
+    try {
+      super.throw(value)
+    } finally {
+      this.nextBack = () => {
+        return { done: true, value: undefined }
+      }
+    }
+    return { done: true, value: undefined }
+  }
+
   public static override unsafeFrom<A>(
     it: compat.BackIterator<A>,
   ): BackIter<A> {
@@ -430,8 +454,7 @@ export abstract class BackIter<A>
       }
 
       public sizeBounds(): SizeBounds {
-        let { min } = state.aSrc.sizeBounds()
-        return { min }
+        return { min: 0 }
       }
     })()
   }
@@ -504,7 +527,7 @@ export abstract class BackIter<A>
         if (this.srcs[srcName] === null) return { done: true, value: undefined }
 
         let { done, value } = this.srcs[srcName].next()
-        if (!done) {
+        if (done) {
           this.srcs[srcName] = null
           return this.next()
         }
@@ -517,7 +540,7 @@ export abstract class BackIter<A>
         if (this.srcs[srcName] === null) return { done: true, value: undefined }
 
         let { done, value } = this.srcs[srcName].nextBack()
-        if (!done) {
+        if (done) {
           this.srcs[srcName] = null
           return this.next()
         }
@@ -901,7 +924,7 @@ export abstract class BackSizeIter<A>
         if (this.srcs[srcName] === null) return { done: true, value: undefined }
 
         let { done, value } = this.srcs[srcName].next()
-        if (!done) {
+        if (done) {
           this.srcs[srcName] = null
           return this.next()
         }
@@ -914,7 +937,7 @@ export abstract class BackSizeIter<A>
         if (this.srcs[srcName] === null) return { done: true, value: undefined }
 
         let { done, value } = this.srcs[srcName].nextBack()
-        if (!done) {
+        if (done) {
           this.srcs[srcName] = null
           return this.next()
         }
@@ -1044,7 +1067,10 @@ function flatMapNext<A, B>(
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { done, value } = state.bSrc.next()
-    if (done) continue
+    if (done) {
+      state.bSrc = null
+      continue
+    }
 
     return { done: false, value }
   }
