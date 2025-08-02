@@ -9,6 +9,7 @@ import { Iter, BackSizeIter } from "@cantrip/iter"
 
 import { rune } from "./rune"
 
+const UTF8_BRAND = Symbol("UTF8_BRAND")
 const UTF8_CONSTRUCTOR_GUARD = Symbol("UTF8_CONSTRUCTOR_GUARD")
 const BUFFER = Symbol("BUFFER")
 
@@ -342,7 +343,10 @@ export function u(rawLits: TemplateStringsArray, ...interps: utf8[]) {
   offset += lits[0].bytes.length
 
   for (let i = 0; i < interps.length; i++) {
-    resultBuf.set(interps[i][BUFFER], offset)
+    resultBuf.set(
+      (interps[i] as unknown as { buffer: Uint8Array }).buffer,
+      offset,
+    )
     offset += interps[i].byteLength
 
     resultBuf.set(lits[i + 1].bytes, offset)
@@ -353,7 +357,10 @@ export function u(rawLits: TemplateStringsArray, ...interps: utf8[]) {
 }
 
 class utf8 {
-  private readonly [BUFFER]: Uint8Array
+  /** @internal */
+  public readonly [UTF8_BRAND] = true
+
+  private readonly buffer: Uint8Array
   public readonly length: number
   public readonly byteLength: number
 
@@ -366,12 +373,14 @@ class utf8 {
       throw new Error("Illegal invocation of utf8 constructor")
     }
 
-    this[BUFFER] = buffer
-    Object.defineProperty(this, BUFFER, { enumerable: false })
-
+    this.buffer = buffer
     this.length = length
     this.byteLength = buffer.length
 
+    Object.defineProperties(this, {
+      buffer: { enumerable: false },
+      [UTF8_BRAND]: { enumerable: false },
+    })
     Object.freeze(this)
   }
 
@@ -408,12 +417,12 @@ class utf8 {
 
   public toBytes(): Uint8Array {
     const result = new Uint8Array(this.byteLength)
-    result.set(this[BUFFER])
+    result.set(this.buffer)
     return result
   }
 
   public toString(): string {
-    return dec.decode(this[BUFFER])
+    return dec.decode(this.buffer)
   }
 
   public valueOf(): string {
@@ -421,15 +430,15 @@ class utf8 {
   }
 
   public chars(): BackSizeIter<string> {
-    return this.runes().map((codePoint) => String.fromCodePoint(codePoint))
+    return this.runes().map((r) => String.fromCodePoint(r))
   }
 
   public runes(): BackSizeIter<rune> {
-    return Iter.from(Utf8Decoder.iterateCodePoints(this[BUFFER], this.length))
+    return Iter.from(Utf8Decoder.iterateCodePoints(this.buffer, this.length))
   }
 
   public bytes(): BackSizeIter<number> {
-    const buffer = this[BUFFER]
+    const buffer = this.buffer
     const byteLength = this.byteLength
     let offset = 0
     let offsetBack = 0
@@ -466,13 +475,13 @@ class utf8 {
 
     let offset = 0
     for (let i = 0; i < start; i++) {
-      offset += Utf8Decoder.decodeCodePoint(this[BUFFER], offset)!.byteLength
+      offset += Utf8Decoder.decodeCodePoint(this.buffer, offset)!.byteLength
     }
 
     if (end === undefined || this.length <= end) {
       return new utf8(
         UTF8_CONSTRUCTOR_GUARD,
-        this[BUFFER].slice(offset),
+        this.buffer.slice(offset),
         this.length - start,
       )
     }
@@ -480,20 +489,20 @@ class utf8 {
     let offsetEnd = offset
     for (let i = start; i < end; i++) {
       offsetEnd += Utf8Decoder.decodeCodePoint(
-        this[BUFFER],
+        this.buffer,
         offsetEnd,
       )!.byteLength
     }
 
     return new utf8(
       UTF8_CONSTRUCTOR_GUARD,
-      this[BUFFER].slice(offset, offsetEnd),
+      this.buffer.slice(offset, offsetEnd),
       end - start,
     )
   }
 
   public runeAt(index: number): rune | undefined {
-    return Utf8Decoder.getCodePointAt(this[BUFFER], index)
+    return Utf8Decoder.getCodePointAt(this.buffer, index)
   }
 
   public charAt(index: number): string | undefined {
@@ -503,7 +512,7 @@ class utf8 {
   }
 
   public byteAt(index: number): number | undefined {
-    return this[BUFFER][index]
+    return this.buffer[index]
   }
 
   public concat(...values: utf8[]): utf8 {
@@ -511,10 +520,10 @@ class utf8 {
     for (let value of values) totalByteLength += value.byteLength
 
     const buffer = new Uint8Array(totalByteLength)
-    buffer.set(this[BUFFER], 0)
+    buffer.set(this.buffer, 0)
     let offset = this.byteLength
     for (let value of values) {
-      buffer.set(value[BUFFER], offset)
+      buffer.set(value.buffer, offset)
       offset += value.byteLength
     }
 
@@ -536,13 +545,13 @@ class utf8 {
 
     let offset = 0
     for (let i = 0; i < values.length - 1; i++) {
-      buffer.set(values[i][BUFFER], offset)
+      buffer.set(values[i].buffer, offset)
       offset += values[i].byteLength
 
-      buffer.set(this[BUFFER], offset)
+      buffer.set(this.buffer, offset)
       offset += this.byteLength
     }
-    buffer.set(values[values.length - 1][BUFFER], offset)
+    buffer.set(values[values.length - 1].buffer, offset)
 
     return new utf8(UTF8_CONSTRUCTOR_GUARD, buffer, totalLength)
   }
