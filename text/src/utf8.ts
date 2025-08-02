@@ -29,7 +29,7 @@ export class Utf8DecodingError extends Error {
   }
 }
 
-export class Utf8Decoder {
+class Utf8Decoder {
   public static decodeCodePoint(
     bytes: Uint8Array,
     offset: number,
@@ -317,58 +317,7 @@ const litCache = {
   },
 }
 
-export interface Utf8Constructor {
-  /**
-   * NOTE: will throw if the literal portions of the template literal are not valid unicode; use lint rule to catch this statically
-   */
-  (lits: TemplateStringsArray, ...interps: utf8[]): utf8
-
-  /** @internal */
-  new (
-    guard: typeof UTF8_CONSTRUCTOR_GUARD,
-    buffer: Uint8Array,
-    length: number,
-  ): utf8
-
-  readonly prototype: utf8
-
-  readonly EMPTY: utf8
-
-  from(src: string | Uint8Array): utf8 | Utf8DecodingError
-}
-
-export const utf8: Utf8Constructor = function (
-  this: unknown,
-  ...args: unknown[]
-): unknown {
-  if (this instanceof utf8) {
-    if (args[0] !== UTF8_CONSTRUCTOR_GUARD) {
-      throw new Error("Illegal invocation of utf8 constructor")
-    }
-
-    Object.defineProperty(this, BUFFER, {
-      enumerable: false,
-      writable: false,
-      value: args[1],
-    })
-
-    Object.defineProperty(this, "length", {
-      enumerable: true,
-      writable: false,
-      value: args[2],
-    })
-
-    Object.defineProperty(this, "byteLength", {
-      enumerable: true,
-      writable: false,
-      value: this[BUFFER].length,
-    })
-
-    return undefined
-  }
-
-  const [rawLits, ...interps] = args as [TemplateStringsArray, ...utf8[]]
-
+export function u(rawLits: TemplateStringsArray, ...interps: utf8[]) {
   const lits = rawLits.map((lit) => {
     const cached = litCache.lookup(lit)
     if (cached instanceof TypeError) throw new Utf8DecodingError(cached)
@@ -401,210 +350,200 @@ export const utf8: Utf8Constructor = function (
   }
 
   return new utf8(UTF8_CONSTRUCTOR_GUARD, resultBuf, totalLen)
-} as Utf8Constructor
-
-export interface utf8 {
-  /** @internal */
-  readonly [BUFFER]: Uint8Array
-
-  readonly length: number
-  readonly byteLength: number
-
-  toBytes(): Uint8Array
-  toString(): string
-  valueOf(): string
-
-  chars(): BackSizeIter<string>
-  runes(): BackSizeIter<rune>
-  bytes(): BackSizeIter<number>
-
-  slice(start?: number, end?: number): utf8
-
-  runeAt(index: number): rune | undefined
-  charAt(index: number): string | undefined
-  byteAt(index: number): number | undefined
-
-  concat(...values: utf8[]): utf8
-  join(values: utf8[]): utf8
 }
 
-Object.defineProperty(utf8, "EMPTY", {
-  writable: false,
-  value: new utf8(UTF8_CONSTRUCTOR_GUARD, new Uint8Array(0), 0),
-})
+class utf8 {
+  private readonly [BUFFER]: Uint8Array
+  public readonly length: number
+  public readonly byteLength: number
 
-utf8.from = function (src: string | Uint8Array): utf8 | Utf8DecodingError {
-  if (typeof src === "string") {
-    const resultBuf = enc.encode(src)
-    try {
-      dec.decode(resultBuf)
-    } catch (e: unknown) {
-      if (e instanceof TypeError) {
-        return new Utf8DecodingError(e)
-      }
+  public constructor(
+    guard: typeof UTF8_CONSTRUCTOR_GUARD,
+    buffer: Uint8Array,
+    length: number,
+  ) {
+    if (guard !== UTF8_CONSTRUCTOR_GUARD) {
+      throw new Error("Illegal invocation of utf8 constructor")
     }
-    return new utf8(UTF8_CONSTRUCTOR_GUARD, resultBuf, [...src].length)
-  } else if (src instanceof Uint8Array) {
-    try {
-      const decoded = dec.decode(src)
-      return new utf8(UTF8_CONSTRUCTOR_GUARD, src, [...decoded].length)
-    } catch (e: unknown) {
-      if (e instanceof TypeError) {
-        return new Utf8DecodingError(e)
-      }
-    }
+
+    this[BUFFER] = buffer
+    Object.defineProperty(this, BUFFER, { enumerable: false })
+
+    this.length = length
+    this.byteLength = buffer.length
+
+    Object.freeze(this)
   }
 
-  throw new TypeError("Expected string or Uint8Array")
-}
+  public static readonly EMPTY = new utf8(
+    UTF8_CONSTRUCTOR_GUARD,
+    new Uint8Array(0),
+    0,
+  )
 
-utf8.prototype.toBytes = function (): Uint8Array {
-  const result = new Uint8Array(this.byteLength)
-  result.set(this[BUFFER])
-  return result
-}
-
-utf8.prototype.toString = function (): string {
-  return dec.decode(this[BUFFER])
-}
-
-utf8.prototype.valueOf = function (): string {
-  return this.toString()
-}
-
-utf8.prototype.chars = function (): BackSizeIter<string> {
-  return this.runes().map((codePoint) => String.fromCodePoint(codePoint))
-}
-
-utf8.prototype.runes = function (): BackSizeIter<rune> {
-  return Iter.from(Utf8Decoder.iterateCodePoints(this[BUFFER], this.length))
-}
-
-utf8.prototype.bytes = function (): BackSizeIter<number> {
-  const buffer = this[BUFFER]
-  const byteLength = this.byteLength
-  let offset = 0
-  let offsetBack = 0
-
-  return Iter.from({
-    [IS_ITERATOR]: true,
-
-    next(): IteratorResult<number> {
-      if (0 <= byteLength - offset - offsetBack) {
-        return { done: true, value: undefined }
+  public static from(src: string | Uint8Array): utf8 | Utf8DecodingError {
+    if (typeof src === "string") {
+      const resultBuf = enc.encode(src)
+      try {
+        dec.decode(resultBuf)
+      } catch (e: unknown) {
+        if (e instanceof TypeError) {
+          return new Utf8DecodingError(e)
+        }
       }
-
-      return { done: false, value: buffer[offset++] }
-    },
-
-    [NEXT_BACK](): IteratorResult<number> {
-      if (0 <= byteLength - offset - offsetBack) {
-        return { done: true, value: undefined }
+      return new utf8(UTF8_CONSTRUCTOR_GUARD, resultBuf, [...src].length)
+    } else if (src instanceof Uint8Array) {
+      try {
+        const decoded = dec.decode(src)
+        return new utf8(UTF8_CONSTRUCTOR_GUARD, src, [...decoded].length)
+      } catch (e: unknown) {
+        if (e instanceof TypeError) {
+          return new Utf8DecodingError(e)
+        }
       }
+    }
 
-      return { done: false, value: buffer[byteLength - 1 - offsetBack++] }
-    },
-
-    [SIZE](): number {
-      return byteLength - offset - offsetBack
-    },
-  })
-}
-
-utf8.prototype.slice = function (
-  this: utf8,
-  start?: number,
-  end?: number,
-): utf8 {
-  if (start === undefined) return this
-
-  if (this.length <= start) return utf8.EMPTY
-
-  let offset = 0
-  for (let i = 0; i < start; i++) {
-    offset += Utf8Decoder.decodeCodePoint(this[BUFFER], offset)!.byteLength
+    throw new TypeError("Expected string or Uint8Array")
   }
 
-  if (end === undefined || this.length <= end) {
+  public toBytes(): Uint8Array {
+    const result = new Uint8Array(this.byteLength)
+    result.set(this[BUFFER])
+    return result
+  }
+
+  public toString(): string {
+    return dec.decode(this[BUFFER])
+  }
+
+  public valueOf(): string {
+    return this.toString()
+  }
+
+  public chars(): BackSizeIter<string> {
+    return this.runes().map((codePoint) => String.fromCodePoint(codePoint))
+  }
+
+  public runes(): BackSizeIter<rune> {
+    return Iter.from(Utf8Decoder.iterateCodePoints(this[BUFFER], this.length))
+  }
+
+  public bytes(): BackSizeIter<number> {
+    const buffer = this[BUFFER]
+    const byteLength = this.byteLength
+    let offset = 0
+    let offsetBack = 0
+
+    return Iter.from({
+      [IS_ITERATOR]: true,
+
+      next(): IteratorResult<number> {
+        if (0 <= byteLength - offset - offsetBack) {
+          return { done: true, value: undefined }
+        }
+
+        return { done: false, value: buffer[offset++] }
+      },
+
+      [NEXT_BACK](): IteratorResult<number> {
+        if (0 <= byteLength - offset - offsetBack) {
+          return { done: true, value: undefined }
+        }
+
+        return { done: false, value: buffer[byteLength - 1 - offsetBack++] }
+      },
+
+      [SIZE](): number {
+        return byteLength - offset - offsetBack
+      },
+    })
+  }
+
+  public slice(start?: number, end?: number): utf8 {
+    if (start === undefined) return this
+
+    if (this.length <= start) return utf8.EMPTY
+
+    let offset = 0
+    for (let i = 0; i < start; i++) {
+      offset += Utf8Decoder.decodeCodePoint(this[BUFFER], offset)!.byteLength
+    }
+
+    if (end === undefined || this.length <= end) {
+      return new utf8(
+        UTF8_CONSTRUCTOR_GUARD,
+        this[BUFFER].slice(offset),
+        this.length - start,
+      )
+    }
+
+    let offsetEnd = offset
+    for (let i = start; i < end; i++) {
+      offsetEnd += Utf8Decoder.decodeCodePoint(
+        this[BUFFER],
+        offsetEnd,
+      )!.byteLength
+    }
+
     return new utf8(
       UTF8_CONSTRUCTOR_GUARD,
-      this[BUFFER].slice(offset),
-      this.length - start,
+      this[BUFFER].slice(offset, offsetEnd),
+      end - start,
     )
   }
 
-  let offsetEnd = offset
-  for (let i = start; i < end; i++) {
-    offsetEnd += Utf8Decoder.decodeCodePoint(
-      this[BUFFER],
-      offsetEnd,
-    )!.byteLength
+  public runeAt(index: number): rune | undefined {
+    return Utf8Decoder.getCodePointAt(this[BUFFER], index)
   }
 
-  return new utf8(
-    UTF8_CONSTRUCTOR_GUARD,
-    this[BUFFER].slice(offset, offsetEnd),
-    end - start,
-  )
-}
-
-utf8.prototype.runeAt = function (this: utf8, index: number): rune | undefined {
-  return Utf8Decoder.getCodePointAt(this[BUFFER], index)
-}
-
-utf8.prototype.charAt = function (
-  this: utf8,
-  index: number,
-): string | undefined {
-  const codePoint = this.runeAt(index)
-  if (codePoint === undefined) return undefined
-  return String.fromCodePoint(codePoint)
-}
-
-utf8.prototype.byteAt = function (
-  this: utf8,
-  index: number,
-): number | undefined {
-  return this[BUFFER][index]
-}
-
-utf8.prototype.concat = function (this: utf8, ...values: utf8[]): utf8 {
-  let totalByteLength = this.byteLength
-  for (let value of values) totalByteLength += value.byteLength
-
-  const buffer = new Uint8Array(totalByteLength)
-  buffer.set(this[BUFFER], 0)
-  let offset = this.byteLength
-  for (let value of values) {
-    buffer.set(value[BUFFER], offset)
-    offset += value.byteLength
+  public charAt(index: number): string | undefined {
+    const codePoint = this.runeAt(index)
+    if (codePoint === undefined) return undefined
+    return String.fromCodePoint(codePoint)
   }
 
-  return new utf8(UTF8_CONSTRUCTOR_GUARD, buffer, totalByteLength)
-}
-
-utf8.prototype.join = function (this: utf8, values: utf8[]): utf8 {
-  if (values.length === 0) return utf8.EMPTY
-  if (values.length === 1) return values[0]
-
-  let totalByteLength = this.byteLength * (values.length - 1)
-  let totalLength = this.length * (values.length - 1)
-  for (let value of values) {
-    totalByteLength += value.byteLength
-    totalLength += value.length
+  public byteAt(index: number): number | undefined {
+    return this[BUFFER][index]
   }
 
-  const buffer = new Uint8Array(totalByteLength)
+  public concat(...values: utf8[]): utf8 {
+    let totalByteLength = this.byteLength
+    for (let value of values) totalByteLength += value.byteLength
 
-  let offset = 0
-  for (let i = 0; i < values.length - 1; i++) {
-    buffer.set(values[i][BUFFER], offset)
-    offset += values[i].byteLength
+    const buffer = new Uint8Array(totalByteLength)
+    buffer.set(this[BUFFER], 0)
+    let offset = this.byteLength
+    for (let value of values) {
+      buffer.set(value[BUFFER], offset)
+      offset += value.byteLength
+    }
 
-    buffer.set(this[BUFFER], offset)
-    offset += this.byteLength
+    return new utf8(UTF8_CONSTRUCTOR_GUARD, buffer, totalByteLength)
   }
-  buffer.set(values[values.length - 1][BUFFER], offset)
 
-  return new utf8(UTF8_CONSTRUCTOR_GUARD, buffer, totalLength)
+  public join(values: utf8[]): utf8 {
+    if (values.length === 0) return utf8.EMPTY
+    if (values.length === 1) return values[0]
+
+    let totalByteLength = this.byteLength * (values.length - 1)
+    let totalLength = this.length * (values.length - 1)
+    for (let value of values) {
+      totalByteLength += value.byteLength
+      totalLength += value.length
+    }
+
+    const buffer = new Uint8Array(totalByteLength)
+
+    let offset = 0
+    for (let i = 0; i < values.length - 1; i++) {
+      buffer.set(values[i][BUFFER], offset)
+      offset += values[i].byteLength
+
+      buffer.set(this[BUFFER], offset)
+      offset += this.byteLength
+    }
+    buffer.set(values[values.length - 1][BUFFER], offset)
+
+    return new utf8(UTF8_CONSTRUCTOR_GUARD, buffer, totalLength)
+  }
 }
