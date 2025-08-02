@@ -1,0 +1,13 @@
+{
+  "name": "@cantrip/text",
+  "version": "0.1.0",
+  "module": "src/mod.ts",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@cantrip/compat": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

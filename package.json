@@ -10,6 +10,7 @@
     "internal-util",
     "iter",
     "scope",
+    "text",
     "babel-plugin-transform-scope",
     "typescript-eslint-rule-await-all-promises"
   ],

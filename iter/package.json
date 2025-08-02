@@ -7,6 +7,9 @@
     ".": "./src/mod.ts",
     "./async": "./src/async.ts"
   },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
   "dependencies": {
     "@cantrip/error": "0.1.0",
     "@cantrip/compat": "0.1.0"
