@@ -13,33 +13,39 @@ export type IterableOrIterator<A> =
   | Iterator<A>
   | compat.Iterable<A>
 
-export type IterFromReturn<It extends IterableOrIterator<unknown>> = It extends
-  | compat.BackSizeIterable<infer A>
-  | compat.BackSizeIterator<infer A>
-  ? BackSizeIter<A>
-  : It extends compat.SizeIterable<infer A> | compat.SizeIterator<infer A>
-    ? SizeIter<A>
-    : It extends compat.BackIterable<infer A> | compat.BackIterator<infer A>
-      ? BackIter<A>
-      : It extends compat.Iterable<infer A> | compat.Iterator<infer A>
-        ? Iter<A>
-        : It extends Iterable<infer A> | Iterator<infer A>
-          ? Iter<A>
-          : never
+export type IterFromReturn<It extends IterableOrIterator<unknown>> =
+  It extends readonly (infer A)[]
+    ? BackSizeIter<A>
+    : It extends
+          | compat.BackSizeIterable<infer A>
+          | compat.BackSizeIterator<infer A>
+      ? BackSizeIter<A>
+      : It extends compat.SizeIterable<infer A> | compat.SizeIterator<infer A>
+        ? SizeIter<A>
+        : It extends compat.BackIterable<infer A> | compat.BackIterator<infer A>
+          ? BackIter<A>
+          : It extends compat.Iterable<infer A> | compat.Iterator<infer A>
+            ? Iter<A>
+            : It extends Iterable<infer A> | Iterator<infer A>
+              ? Iter<A>
+              : never
 
-export type NextType<It extends IterableOrIterator<unknown>> = It extends
-  | compat.BackSizeIterable<infer A>
-  | compat.BackSizeIterator<infer A>
-  ? A
-  : It extends compat.SizeIterable<infer A> | compat.SizeIterator<infer A>
+export type NextType<It extends IterableOrIterator<unknown>> =
+  It extends readonly (infer A)[]
     ? A
-    : It extends compat.BackIterable<infer A> | compat.BackIterator<infer A>
+    : It extends
+          | compat.BackSizeIterable<infer A>
+          | compat.BackSizeIterator<infer A>
       ? A
-      : It extends compat.Iterable<infer A> | compat.Iterator<infer A>
+      : It extends compat.SizeIterable<infer A> | compat.SizeIterator<infer A>
         ? A
-        : It extends Iterable<infer A> | Iterator<infer A>
+        : It extends compat.BackIterable<infer A> | compat.BackIterator<infer A>
           ? A
-          : never
+          : It extends compat.Iterable<infer A> | compat.Iterator<infer A>
+            ? A
+            : It extends Iterable<infer A> | Iterator<infer A>
+              ? A
+              : never
 
 function asIterator<A>(src: IterableOrIterator<A>): Iterator<A> {
   if (compat.isIterable(src)) return src[compat.ITERATOR]()
@@ -898,23 +904,23 @@ export abstract class BackSizeIter<A>
   }
 
   public override chain<
-    B,
-    IterB extends compat.BackSizeIterator<B> | compat.BackSizeIterable<B>,
-  >(f: IterB): BackSizeIter<A | B>
+    IterB extends
+      | compat.BackSizeIterator<unknown>
+      | compat.BackSizeIterable<unknown>,
+  >(f: IterB): BackSizeIter<A | NextType<IterB>>
+
+  public override chain<
+    IterB extends compat.BackIterator<unknown> | compat.BackIterable<unknown>,
+  >(f: IterB): BackIter<A | NextType<IterB>>
 
   public override chain<
     B,
-    IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
-  >(f: IterB): BackIter<A | B>
+    IterB extends compat.SizeIterator<unknown> | compat.SizeIterable<unknown>,
+  >(f: IterB): SizeIter<A | NextType<IterB>>
 
-  public override chain<
-    B,
-    IterB extends compat.SizeIterator<B> | compat.SizeIterable<B>,
-  >(f: IterB): SizeIter<A | B>
-
-  public override chain<B, IterB extends IterableOrIterator<B>>(
+  public override chain<IterB extends IterableOrIterator<unknown>>(
     f: IterB,
-  ): Iter<A | B>
+  ): Iter<A | NextType<IterB>>
 
   public override chain<B>(bs_: IterableOrIterator<B>): Iter<A | B> {
     let bs: compat.BackSizeIterator<B>

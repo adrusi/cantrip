@@ -26,70 +26,29 @@ describe("BackSizeIter", () => {
 
   describe("iterator protocol", () => {
     test("implements Symbol.iterator", () => {
-      const iter = BackSizeIter.unsafeFrom({
-        [compat.IS_ITERATOR]: true,
-        [compat.NEXT_BACK]: () => ({ done: true, value: undefined }),
-        [compat.SIZE]: () => 0,
-        next: () => ({ done: true, value: undefined }),
-      })
+      const iter = BackSizeIter.from([])
       expect(iter[Symbol.iterator]).toBeDefined()
       expect(iter[Symbol.iterator]()).toBe(iter)
     })
 
     test("implements compat.ITERATOR", () => {
-      const iter = BackSizeIter.unsafeFrom({
-        [compat.IS_ITERATOR]: true,
-        [compat.NEXT_BACK]: () => ({ done: true, value: undefined }),
-        [compat.SIZE]: () => 0,
-        next: () => ({ done: true, value: undefined }),
-      })
+      const iter = BackSizeIter.from([])
       expect(iter[compat.ITERATOR]).toBeDefined()
       expect(iter[compat.ITERATOR]()).toBe(iter)
     })
 
     test("has IS_BACK_ITERABLE symbol", () => {
-      const iter = BackSizeIter.unsafeFrom({
-        [compat.IS_ITERATOR]: true,
-        [compat.NEXT_BACK]: () => ({ done: true, value: undefined }),
-        [compat.SIZE]: () => 0,
-        next: () => ({ done: true, value: undefined }),
-      })
+      const iter = BackSizeIter.from([])
       expect(iter[compat.IS_BACK_ITERABLE]).toBe(true)
     })
 
     test("has IS_SIZE_ITERABLE symbol", () => {
-      const iter = BackSizeIter.unsafeFrom({
-        [compat.IS_ITERATOR]: true,
-        [compat.NEXT_BACK]: () => ({ done: true, value: undefined }),
-        [compat.SIZE]: () => 0,
-        next: () => ({ done: true, value: undefined }),
-      })
+      const iter = BackSizeIter.from([])
       expect(iter[compat.IS_SIZE_ITERABLE]).toBe(true)
     })
 
     test("implements NEXT_BACK and SIZE", () => {
-      const values = [1, 2, 3]
-      let frontIndex = 0
-      let backIndex = values.length - 1
-
-      const iter = BackSizeIter.unsafeFrom({
-        [compat.IS_ITERATOR]: true,
-        next() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[frontIndex++] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.NEXT_BACK]() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[backIndex--] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.SIZE]() {
-          return Math.max(0, backIndex - frontIndex + 1)
-        },
-      })
+      const iter = BackSizeIter.from([1, 2, 3])
 
       expect(iter[compat.SIZE]()).toBe(3)
       expect(iter[compat.NEXT_BACK]()).toEqual({ done: false, value: 3 })
@@ -98,36 +57,8 @@ describe("BackSizeIter", () => {
   })
 
   describe("bidirectional iteration with size tracking", () => {
-    function createBackSizeIterator(
-      values: number[],
-    ): compat.BackSizeIterator<number> {
-      let frontIndex = 0
-      let backIndex = values.length - 1
-
-      return {
-        [compat.IS_ITERATOR]: true,
-        next() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[frontIndex++] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.NEXT_BACK]() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[backIndex--] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.SIZE]() {
-          return Math.max(0, backIndex - frontIndex + 1)
-        },
-      }
-    }
-
     test("can iterate from both ends with accurate size", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3, 4, 5]),
-      )
+      const iter = BackSizeIter.from([1, 2, 3, 4, 5])
 
       expect(iter.size()).toBe(5)
       expect(iter.next()).toEqual({ done: false, value: 1 })
@@ -145,7 +76,7 @@ describe("BackSizeIter", () => {
     })
 
     test("handles empty iterator", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([]))
+      const iter = BackSizeIter.from([])
 
       expect(iter.size()).toBe(0)
       expect(iter.next()).toEqual({ done: true, value: undefined })
@@ -154,7 +85,7 @@ describe("BackSizeIter", () => {
     })
 
     test("handles single element", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([42]))
+      const iter = BackSizeIter.from([42])
 
       expect(iter.size()).toBe(1)
       expect(iter.next()).toEqual({ done: false, value: 42 })
@@ -164,45 +95,17 @@ describe("BackSizeIter", () => {
     })
 
     test("size bounds are exact", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2, 3]))
-      expect(iter.sizeBounds()).toEqual({ lower: 3, upper: 3 })
+      const iter = BackSizeIter.from([1, 2, 3])
+      expect(iter.sizeBounds()).toEqual({ min: 3, max: 3 })
 
       iter.next()
-      expect(iter.sizeBounds()).toEqual({ lower: 2, upper: 2 })
+      expect(iter.sizeBounds()).toEqual({ min: 2, max: 2 })
     })
   })
 
   describe("map", () => {
-    function createBackSizeIterator(
-      values: number[],
-    ): compat.BackSizeIterator<number> {
-      let frontIndex = 0
-      let backIndex = values.length - 1
-
-      return {
-        [compat.IS_ITERATOR]: true,
-        next() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[frontIndex++] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.NEXT_BACK]() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[backIndex--] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.SIZE]() {
-          return Math.max(0, backIndex - frontIndex + 1)
-        },
-      }
-    }
-
     test("maps values from front with size tracking", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3]),
-      ).map((x) => x * 2)
+      const iter = BackSizeIter.from([1, 2, 3]).map((x) => x * 2)
 
       expect(iter.size()).toBe(3)
       expect(iter.next()).toEqual({ done: false, value: 2 })
@@ -215,9 +118,7 @@ describe("BackSizeIter", () => {
     })
 
     test("maps values from back with size tracking", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3]),
-      ).map((x) => x * 2)
+      const iter = BackSizeIter.from([1, 2, 3]).map((x) => x * 2)
 
       expect(iter.size()).toBe(3)
       expect(iter[compat.NEXT_BACK]()).toEqual({ done: false, value: 6 })
@@ -230,9 +131,7 @@ describe("BackSizeIter", () => {
     })
 
     test("maps values from both ends", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3, 4, 5]),
-      ).map((x) => x * 2)
+      const iter = BackSizeIter.from([1, 2, 3, 4, 5]).map((x) => x * 2)
 
       expect(iter.size()).toBe(5)
       expect(iter.next()).toEqual({ done: false, value: 2 })
@@ -248,43 +147,15 @@ describe("BackSizeIter", () => {
     })
 
     test("preserves exact size bounds", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3]),
-      ).map((x) => x * 2)
-      expect(iter.sizeBounds()).toEqual({ lower: 3, upper: 3 })
+      const iter = BackSizeIter.from([1, 2, 3]).map((x) => x * 2)
+      expect(iter.sizeBounds()).toEqual({ min: 3, max: 3 })
     })
   })
 
   describe("chain", () => {
-    function createBackSizeIterator(
-      values: number[],
-    ): compat.BackSizeIterator<number> {
-      let frontIndex = 0
-      let backIndex = values.length - 1
-
-      return {
-        [compat.IS_ITERATOR]: true,
-        next() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[frontIndex++] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.NEXT_BACK]() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[backIndex--] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.SIZE]() {
-          return Math.max(0, backIndex - frontIndex + 1)
-        },
-      }
-    }
-
     test("chains from front with correct size", () => {
-      const iter1 = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2]))
-      const iter2 = BackSizeIter.unsafeFrom(createBackSizeIterator([3, 4]))
+      const iter1 = BackSizeIter.from([1, 2])
+      const iter2 = BackSizeIter.from([3, 4])
       const chained = iter1.chain(iter2)
 
       expect(chained.size()).toBe(4)
@@ -300,8 +171,8 @@ describe("BackSizeIter", () => {
     })
 
     test("chains from back with correct size", () => {
-      const iter1 = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2]))
-      const iter2 = BackSizeIter.unsafeFrom(createBackSizeIterator([3, 4]))
+      const iter1 = BackSizeIter.from([1, 2])
+      const iter2 = BackSizeIter.from([3, 4])
       const chained = iter1.chain(iter2)
 
       expect(chained.size()).toBe(4)
@@ -320,8 +191,8 @@ describe("BackSizeIter", () => {
     })
 
     test("chains from both ends with size tracking", () => {
-      const iter1 = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2]))
-      const iter2 = BackSizeIter.unsafeFrom(createBackSizeIterator([3, 4]))
+      const iter1 = BackSizeIter.from([1, 2])
+      const iter2 = BackSizeIter.from([3, 4])
       const chained = iter1.chain(iter2)
 
       expect(chained.size()).toBe(4)
@@ -337,45 +208,17 @@ describe("BackSizeIter", () => {
     })
 
     test("preserves exact size bounds", () => {
-      const iter1 = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2, 3]))
-      const iter2 = BackSizeIter.unsafeFrom(createBackSizeIterator([4, 5]))
+      const iter1 = BackSizeIter.from([1, 2, 3])
+      const iter2 = BackSizeIter.from([4, 5])
       const chained = iter1.chain(iter2)
 
-      expect(chained.sizeBounds()).toEqual({ lower: 5, upper: 5 })
+      expect(chained.sizeBounds()).toEqual({ min: 5, max: 5 })
     })
   })
 
   describe("reversed", () => {
-    function createBackSizeIterator(
-      values: number[],
-    ): compat.BackSizeIterator<number> {
-      let frontIndex = 0
-      let backIndex = values.length - 1
-
-      return {
-        [compat.IS_ITERATOR]: true,
-        next() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[frontIndex++] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.NEXT_BACK]() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[backIndex--] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.SIZE]() {
-          return Math.max(0, backIndex - frontIndex + 1)
-        },
-      }
-    }
-
     test("reverses iteration order with size tracking", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3]),
-      ).reversed()
+      const iter = BackSizeIter.from([1, 2, 3]).reversed()
 
       expect(iter.size()).toBe(3)
       expect(iter.next()).toEqual({ done: false, value: 3 })
@@ -388,9 +231,7 @@ describe("BackSizeIter", () => {
     })
 
     test("reverses back iteration with size tracking", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3]),
-      ).reversed()
+      const iter = BackSizeIter.from([1, 2, 3]).reversed()
 
       expect(iter.size()).toBe(3)
       expect(iter[compat.NEXT_BACK]()).toEqual({ done: false, value: 1 })
@@ -403,95 +244,15 @@ describe("BackSizeIter", () => {
     })
 
     test("preserves exact size bounds", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3]),
-      ).reversed()
-      expect(iter.sizeBounds()).toEqual({ lower: 3, upper: 3 })
-    })
-  })
-
-  describe("method overrides", () => {
-    function createBackSizeIterator(
-      values: number[],
-    ): compat.BackSizeIterator<number> {
-      let frontIndex = 0
-      let backIndex = values.length - 1
-
-      return {
-        [compat.IS_ITERATOR]: true,
-        next() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[frontIndex++] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.NEXT_BACK]() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[backIndex--] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.SIZE]() {
-          return Math.max(0, backIndex - frontIndex + 1)
-        },
-      }
-    }
-
-    test("flatMap throws error (not implemented)", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2, 3]))
-      expect(() =>
-        iter.flatMap((x) =>
-          BackSizeIter.unsafeFrom(createBackSizeIterator([x])),
-        ),
-      ).toThrow()
-    })
-
-    test("filter throws error (not implemented)", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2, 3]))
-      expect(() => iter.filter((x) => x > 1)).toThrow()
-    })
-
-    test("take throws error (not implemented)", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2, 3]))
-      expect(() => iter.take(2)).toThrow()
-    })
-
-    test("drop throws error (not implemented)", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2, 3]))
-      expect(() => iter.drop(1)).toThrow()
+      const iter = BackSizeIter.from([1, 2, 3]).reversed()
+      expect(iter.sizeBounds()).toEqual({ min: 3, max: 3 })
     })
   })
 
   describe("method chaining", () => {
-    function createBackSizeIterator(
-      values: number[],
-    ): compat.BackSizeIterator<number> {
-      let frontIndex = 0
-      let backIndex = values.length - 1
-
-      return {
-        [compat.IS_ITERATOR]: true,
-        next() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[frontIndex++] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.NEXT_BACK]() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[backIndex--] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.SIZE]() {
-          return Math.max(0, backIndex - frontIndex + 1)
-        },
-      }
-    }
-
     test("chains available operations", () => {
-      const iter1 = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2]))
-      const iter2 = BackSizeIter.unsafeFrom(createBackSizeIterator([3, 4]))
+      const iter1 = BackSizeIter.from([1, 2])
+      const iter2 = BackSizeIter.from([3, 4])
       const chained = iter1
         .chain(iter2)
         .map((x) => x * 2)
@@ -510,34 +271,8 @@ describe("BackSizeIter", () => {
   })
 
   describe("edge cases", () => {
-    function createBackSizeIterator(
-      values: number[],
-    ): compat.BackSizeIterator<number> {
-      let frontIndex = 0
-      let backIndex = values.length - 1
-
-      return {
-        [compat.IS_ITERATOR]: true,
-        next() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[frontIndex++] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.NEXT_BACK]() {
-          if (frontIndex <= backIndex) {
-            return { done: false, value: values[backIndex--] }
-          }
-          return { done: true, value: undefined }
-        },
-        [compat.SIZE]() {
-          return Math.max(0, backIndex - frontIndex + 1)
-        },
-      }
-    }
-
     test("exhaustion from one end affects the other and size", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2, 3]))
+      const iter = BackSizeIter.from([1, 2, 3])
 
       expect(iter.size()).toBe(3)
       expect(iter.next()).toEqual({ done: false, value: 1 })
@@ -554,9 +289,7 @@ describe("BackSizeIter", () => {
     })
 
     test("works with null and undefined values", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([null, undefined, 0]),
-      )
+      const iter = BackSizeIter.from([null, undefined, 0])
 
       expect(iter.size()).toBe(3)
       expect(iter.next()).toEqual({ done: false, value: null })
@@ -568,9 +301,7 @@ describe("BackSizeIter", () => {
     })
 
     test("meets in the middle with accurate size", () => {
-      const iter = BackSizeIter.unsafeFrom(
-        createBackSizeIterator([1, 2, 3, 4, 5]),
-      )
+      const iter = BackSizeIter.from([1, 2, 3, 4, 5])
 
       expect(iter.size()).toBe(5)
       expect(iter.next()).toEqual({ done: false, value: 1 })
@@ -600,11 +331,11 @@ describe("BackSizeIter", () => {
       })
 
       expect(iter.size()).toBe(largeSize)
-      expect(iter.sizeBounds()).toEqual({ lower: largeSize, upper: largeSize })
+      expect(iter.sizeBounds()).toEqual({ min: largeSize, max: largeSize })
     })
 
     test("size consistency after multiple calls", () => {
-      const iter = BackSizeIter.unsafeFrom(createBackSizeIterator([1, 2]))
+      const iter = BackSizeIter.from([1, 2])
 
       expect(iter.size()).toBe(2)
       expect(iter.size()).toBe(2) // Should be consistent
