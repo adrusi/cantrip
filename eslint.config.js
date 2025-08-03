@@ -14,6 +14,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
+  prettier,
   {
     languageOptions: {
       parserOptions: {
@@ -303,5 +304,4 @@ export default tseslint.config(
     files: ["*.js"],
     ...tseslint.configs.disableTypeChecked,
   },
-  prettier,
 )

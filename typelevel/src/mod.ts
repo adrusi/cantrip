@@ -11,6 +11,7 @@ export type {
   Decrement,
   Multiply,
 } from "./nat"
+export type { Assert, Test } from "./assert"
 
 export type UnionToTuple<Union, Result extends unknown[] = []> =
   UnionToOverloads<Union> extends (_: infer Head) => void

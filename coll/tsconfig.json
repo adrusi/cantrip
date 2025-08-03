@@ -3,7 +3,9 @@
   "compilerOptions": {
     "paths": {
       "@cantrip/compat/iter": ["../compat/src/iter.ts"],
-      "@cantrip/iter": ["../iter/src/mod.ts"]
+      "@cantrip/compat/core": ["../compat/src/core.ts"],
+      "@cantrip/iter": ["../iter/src/mod.ts"],
+      "@cantrip/typelevel": ["../typelevel/src/mod.ts"]
     }
   }
 }

@@ -8,7 +8,13 @@
     "./iter/async": "./src/iter-async.ts",
     "./core": "./src/core.ts"
   },
-  "devDependencies": {},
+  "dependencies": {
+    "@cantrip/iter": "0.1.0",
+    "@cantrip/compat": "0.1.0"
+  },
+  "devDependencies": {
+    "@cantrip/typelevel": "0.1.0"
+  },
   "peerDependencies": {
     "typescript": "^5.4.0"
   }

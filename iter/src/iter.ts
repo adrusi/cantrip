@@ -1,7 +1,6 @@
 import "./patch-std"
 
 import * as compat from "@cantrip/compat/iter"
-import { ArgumentError } from "@cantrip/error"
 
 type SizeBounds = {
   readonly min: number
@@ -109,7 +108,7 @@ export abstract class Iter<A>
     } else if (compat.isStdIterable(it)) {
       return Iter.wrap(it[Symbol.iterator]())
     } else {
-      throw new ArgumentError("Iter.from expects an iterable or iterator")
+      throw new Error("Iter.from expects an iterable or iterator")
     }
   }
 

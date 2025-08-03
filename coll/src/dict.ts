@@ -11,111 +11,151 @@
  * This way, the vast majority of uses can get the delightfully simple undefined-based api, while we still make writing correct code easier than writing incorrect code.
  */
 
-export const NOT_PRESENT = Symbol("NOT_PRESENT")
-const DICT_GUARD = Symbol("DICT_GUARD")
+/* eslint @typescript-eslint/no-redeclare: 0 */
 
-export type DefaultFor<V> = undefined extends V ? typeof NOT_PRESENT : undefined
+import type {
+  DictP as DictP_,
+  DictMut as DictMut_,
+  DefaultBoundFor,
+  DefaultFor,
+} from "./types/dict"
 
-export type DefaultBoundFor<V> = undefined extends V ? symbol : undefined
+import type { IterableOrIterator } from "@cantrip/iter"
 
-export class Dict<K, V, Default = DefaultFor<V>> {
-  private readonly dictMap: Map<K, V>
-  public readonly default_: Default
+export type DictP<
+  K,
+  V,
+  Default extends DefaultBoundFor<V> = DefaultFor<V>,
+> = DictP_<K, V, Default>
 
-  private constructor(guard: typeof DICT_GUARD, default_: Default) {
-    if (guard !== DICT_GUARD) {
-      throw new Error("illegal invocation of Dict constructor")
-    }
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export const DictP = Object.freeze({
+  withDefault: dictPWithDefault as typeof dictPWithDefault,
+  fromEntries: dictPFromEntries as typeof dictPFromEntries,
+  of: dictPOf as typeof dictPOf,
+})
 
-    this.dictMap = new Map()
-    this.default_ = default_
-  }
+function dictPWithDefault<
+  K,
+  V,
+  Default extends DefaultBoundFor<V> = DefaultFor<V>,
+>(_default_: Default): DictP_<K, V, Default> {
+  throw new Error("Not implemented")
+}
 
-  public static withDefault<
-    K,
-    V,
-    Default extends DefaultBoundFor<V> = DefaultFor<V>,
-  >(default_: Default): Dict<K, V, Default> {
-    return new Dict<K, V, Default>(DICT_GUARD, default_)
-  }
+function dictPFromEntries<
+  K,
+  V,
+  Default extends DefaultBoundFor<V> = DefaultFor<V>,
+>(default_: Default, entries: IterableOrIterator<[K, V]>): DictP_<K, V, Default>
 
-  public static fromEntries<K, V>(
-    entries: Iterable<{ key: K; value: V }>,
-  ): undefined extends V ? never : Dict<K, V, undefined>
+function dictPFromEntries<K, V>(
+  ...args:
+    | [IterableOrIterator<[K, V]>]
+    | [undefined | symbol, IterableOrIterator<[K, V]>]
+): DictP_<K, V, DefaultFor<V>> {
+  const _default_ = args.length === 1 ? undefined : args[0]
+  const _entries = args.length === 1 ? args[0] : args[1]
 
-  public static fromEntries<
-    K,
-    V,
-    Default extends DefaultBoundFor<V> = DefaultFor<V>,
-  >(
-    default_: Default,
-    entries: Iterable<{ key: K; value: V }>,
-  ): Dict<K, V, Default>
+  throw new Error("Not implemented")
+}
 
-  public static fromEntries<K, V>(
-    ...args:
-      | [Iterable<{ key: K; value: V }>]
-      | [undefined | symbol, Iterable<{ key: K; value: V }>]
-  ): Dict<K, V, undefined | symbol> {
-    const default_ = args.length === 1 ? undefined : args[0]
-    const entries = args.length === 1 ? args[0] : args[1]
+function dictPOf<K, V>(
+  ...entries: [K, V][]
+): undefined extends V ? never : DictP_<K, V, DefaultFor<V>>
 
-    const dict = Dict.withDefault<K, V>(default_ as DefaultFor<V>) as Dict<
-      K,
-      V,
-      undefined | symbol
-    >
-    for (const { key, value } of entries) dict.put(key, value)
+function dictPOf<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>(
+  default_: Default,
+  ...entries: [K, V][]
+): DictP_<K, V, Default>
 
-    return dict
-  }
+function dictPOf<K, V>(
+  ...args: [K, V][] | [undefined | symbol, ...[K, V][]]
+): DictP_<K, V, DefaultFor<V>> {
+  const _default_ =
+    typeof args[0] === "symbol" || typeof args[0] === "undefined"
+      ? args[0]
+      : undefined
+  const _entries = (
+    typeof args[0] === "symbol" || typeof args[0] === "undefined"
+      ? args.slice(1)
+      : args
+  ) as [K, V][]
 
-  public static of<K, V>(
-    ...entries: [K, V][]
-  ): undefined extends V ? never : Dict<K, V, undefined>
+  throw new Error("Not implemented")
+}
 
-  public static of<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>(
-    default_: Default,
-    ...entries: [K, V][]
-  ): Dict<K, V, Default>
+export type DictMut<
+  K,
+  V,
+  Default extends DefaultBoundFor<V> = DefaultFor<V>,
+> = DictMut_<K, V, Default>
 
-  public static of<K, V>(
-    ...args: [K, V][] | [undefined | symbol, ...[K, V][]]
-  ): Dict<K, V, undefined | symbol> {
-    const default_ =
-      typeof args[0] === "symbol" || typeof args[0] === "undefined"
-        ? args[0]
-        : undefined
-    const entries = (
-      typeof args[0] === "symbol" || typeof args[0] === "undefined"
-        ? args.slice(1)
-        : args
-    ) as [K, V][]
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export const DictMut = Object.freeze({
+  withDefault: dictMutWithDefault as typeof dictMutWithDefault,
+  fromEntries: dictMutFromEntries as typeof dictMutFromEntries,
+  of: dictMutOf as typeof dictMutOf,
+})
 
-    const dict = Dict.withDefault<K, V>(default_ as DefaultFor<V>) as Dict<
-      K,
-      V,
-      undefined | symbol
-    >
-    for (const [key, value] of entries) dict.put(key, value)
+function dictMutWithDefault<
+  K,
+  V,
+  Default extends DefaultBoundFor<V> = DefaultFor<V>,
+>(_default_: Default): DictMut_<K, V, Default> {
+  throw new Error("Not implemented")
+}
 
-    return dict
-  }
+function dictMutFromEntries<
+  K,
+  V,
+  Default extends DefaultBoundFor<V> = DefaultFor<V>,
+>(
+  default_: Default,
+  entries: IterableOrIterator<[K, V]>,
+): DictMut_<K, V, Default>
 
-  public put(key: K, value: V): void {
-    if ((value as unknown) === this.default_) {
-      throw new Error("attempted to store default value in dict")
-    }
+function dictMutFromEntries<
+  K,
+  V,
+  Default extends DefaultBoundFor<V> = DefaultFor<V>,
+>(
+  default_: Default,
+  entries: IterableOrIterator<[K, V]>,
+): DictMut_<K, V, Default>
 
-    this.dictMap.set(key, value)
-  }
+function dictMutFromEntries<K, V>(
+  ...args:
+    | [IterableOrIterator<[K, V]>]
+    | [undefined | symbol, IterableOrIterator<[K, V]>]
+): DictMut_<K, V, DefaultFor<V>> {
+  const _default_ = args.length === 1 ? undefined : args[0]
+  const _entries = args.length === 1 ? args[0] : args[1]
 
-  public has(key: K): boolean {
-    return this.dictMap.has(key)
-  }
+  throw new Error("Not implemented")
+}
 
-  public get(key: K): V | Default {
-    if (!this.dictMap.has(key)) return this.default_
-    return this.dictMap.get(key) as V
-  }
+function dictMutOf<K, V>(
+  ...entries: [K, V][]
+): undefined extends V ? never : DictMut_<K, V, DefaultFor<V>>
+
+function dictMutOf<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>(
+  default_: Default,
+  ...entries: [K, V][]
+): DictMut_<K, V, Default>
+
+function dictMutOf<K, V>(
+  ...args: [K, V][] | [undefined | symbol, ...[K, V][]]
+): DictMut_<K, V, DefaultFor<V>> {
+  const _default_ =
+    typeof args[0] === "symbol" || typeof args[0] === "undefined"
+      ? args[0]
+      : undefined
+  const _entries = (
+    typeof args[0] === "symbol" || typeof args[0] === "undefined"
+      ? args.slice(1)
+      : args
+  ) as [K, V][]
+
+  throw new Error("Not implemented")
 }
