@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest"
 import { SizeIter } from "../src/iter"
+
 import * as compat from "@cantrip/compat/iter"
 
 function mkSizeIter<A>(it: compat.BackSizeIterable<A>): SizeIter<A> {

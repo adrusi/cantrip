@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest"
 import { Iter } from "../src/iter"
+
 import * as compat from "@cantrip/compat/iter"
 
 function mkIter<A>(it: compat.BackSizeIterable<A>): Iter<A> {
@@ -38,7 +39,7 @@ describe("Iter", () => {
     })
 
     test("from - handles generators", () => {
-      function* gen() {
+      function* gen(): Generator<number> {
         yield 1
         yield 2
         yield 3

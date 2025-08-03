@@ -76,6 +76,13 @@ export default tseslint.config(
           trailingUnderscore: "allow",
         },
         {
+          selector: "classProperty",
+          modifiers: ["static", "readonly"],
+          format: ["UPPER_CASE"],
+          leadingUnderscore: "allow",
+          trailingUnderscore: "allow",
+        },
+        {
           selector: "import",
           format: ["camelCase", "PascalCase"],
         },

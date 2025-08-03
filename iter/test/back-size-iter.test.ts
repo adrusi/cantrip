@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest"
 import { BackSizeIter } from "../src/iter"
+
 import * as compat from "@cantrip/compat/iter"
 
 describe("BackSizeIter", () => {
@@ -7,13 +8,13 @@ describe("BackSizeIter", () => {
     test("unsafeFrom - creates back size iterator from back size iterator", () => {
       const backSizeIterator: compat.BackSizeIterator<number> = {
         [compat.IS_ITERATOR]: true,
-        [compat.NEXT_BACK]: function () {
+        [compat.NEXT_BACK]() {
           return { done: true, value: undefined }
         },
-        [compat.SIZE]: function () {
+        [compat.SIZE]() {
           return 0
         },
-        next: function () {
+        next() {
           return { done: true, value: undefined }
         },
       }

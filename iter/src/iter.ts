@@ -914,7 +914,6 @@ export abstract class BackSizeIter<A>
   >(f: IterB): BackIter<A | NextType<IterB>>
 
   public override chain<
-    B,
     IterB extends compat.SizeIterator<unknown> | compat.SizeIterable<unknown>,
   >(f: IterB): SizeIter<A | NextType<IterB>>
 

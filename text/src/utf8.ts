@@ -1,3 +1,4 @@
+/* eslint new-cap: 0 */
 import {
   type BackSizeIterator,
   type IteratorResult,
@@ -5,20 +6,19 @@ import {
   NEXT_BACK,
   SIZE,
 } from "@cantrip/compat/iter"
-import { Iter, BackSizeIter } from "@cantrip/iter"
+import { Iter, type BackSizeIter } from "@cantrip/iter"
 
-import { rune } from "./rune"
+import type { rune } from "./rune"
 
 const UTF8_BRAND = Symbol("UTF8_BRAND")
 const UTF8_CONSTRUCTOR_GUARD = Symbol("UTF8_CONSTRUCTOR_GUARD")
-const BUFFER = Symbol("BUFFER")
 
 export class Utf8DecodingError extends Error {
-  constructor(e: TypeError)
+  public constructor(e: TypeError)
 
-  constructor(message: string)
+  public constructor(message: string)
 
-  constructor(arg: unknown) {
+  public constructor(arg: unknown) {
     if (arg instanceof TypeError) {
       super(arg.message)
       this.cause = arg
@@ -30,8 +30,8 @@ export class Utf8DecodingError extends Error {
   }
 }
 
-class Utf8Decoder {
-  public static decodeCodePoint(
+export const utf8Decoder = {
+  decodeCodePoint(
     bytes: Uint8Array,
     offset: number,
   ): { codePoint: rune; byteLength: number } | null {
@@ -86,10 +86,10 @@ class Utf8Decoder {
     }
 
     return null // Invalid UTF-8
-  }
+  },
 
   // Check if a byte could be the start of a UTF-8 sequence
-  public static isStartByte(byte: number): boolean {
+  isStartByte(byte: number): boolean {
     // ASCII: 0xxxxxxx
     if (byte < 0x80) return true
     // 2-byte start: 110xxxxx
@@ -100,12 +100,12 @@ class Utf8Decoder {
     if ((byte & 0xf8) === 0xf0) return true
     // Continuation byte: 10xxxxxx
     return false
-  }
+  },
 
   // Check if a byte is a UTF-8 continuation byte
-  public static isContinuationByte(byte: number): boolean {
+  isContinuationByte(byte: number): boolean {
     return (byte & 0xc0) === 0x80
-  }
+  },
 
   /**
    * Find the start offset of the codePoint that comes immediately before the given offset
@@ -113,10 +113,7 @@ class Utf8Decoder {
    * @param {number} offset - The byte offset to search backwards from
    * @returns {number|null} The start offset of the previous codePoint, or null if not found
    */
-  public static findPreviousCodePointStart(
-    bytes: Uint8Array,
-    offset: number,
-  ): number | null {
+  findPreviousCodePointStart(bytes: Uint8Array, offset: number): number | null {
     // Edge case: offset is 0 or negative, no previous codePoint
     if (offset <= 0) return null
 
@@ -156,7 +153,7 @@ class Utf8Decoder {
     }
 
     return searchPos
-  }
+  },
 
   /**
    * Find the start offset of the codePoint that contains the given offset
@@ -164,10 +161,7 @@ class Utf8Decoder {
    * @param {number} offset - The byte offset that might be inside a codePoint
    * @returns {number|null} The start offset of the containing codePoint
    */
-  public static findCodePointStart(
-    bytes: Uint8Array,
-    offset: number,
-  ): number | null {
+  findCodePointStart(bytes: Uint8Array, offset: number): number | null {
     // Edge cases
     if (offset < 0) return null
     if (offset >= bytes.length) return null
@@ -197,9 +191,9 @@ class Utf8Decoder {
     }
 
     return null // Something went wrong
-  }
+  },
 
-  public static iterateCodePoints(
+  iterateCodePoints(
     bytes: Uint8Array,
     codePointSize: number,
   ): BackSizeIterator<rune> {
@@ -215,7 +209,7 @@ class Utf8Decoder {
           return { done: true, value: undefined }
         }
 
-        const result = Utf8Decoder.decodeCodePoint(bytes, offset)
+        const result = utf8Decoder.decodeCodePoint(bytes, offset)
         if (result === null) {
           throw new Utf8DecodingError(`Invalid UTF-8 at offset ${offset}`)
         }
@@ -230,7 +224,7 @@ class Utf8Decoder {
           return { done: true, value: undefined }
         }
 
-        const codePointStart = Utf8Decoder.findPreviousCodePointStart(
+        const codePointStart = utf8Decoder.findPreviousCodePointStart(
           bytes,
           offsetBack,
         )
@@ -238,7 +232,7 @@ class Utf8Decoder {
           throw new Utf8DecodingError(`Invalid UTF-8 at offset ${offsetBack}`)
         }
 
-        const result = Utf8Decoder.decodeCodePoint(bytes, codePointStart)
+        const result = utf8Decoder.decodeCodePoint(bytes, codePointStart)
         if (result === null) {
           throw new Utf8DecodingError(
             `Invalid UTF-8 at offset ${codePointStart}`,
@@ -254,9 +248,9 @@ class Utf8Decoder {
         return codePointSize - nconsumed
       },
     }
-  }
+  },
 
-  public static getCodePointCount(bytes: Uint8Array): number {
+  getCodePointCount(bytes: Uint8Array): number {
     let count = 0
     let offset = 0
     while (offset < bytes.length) {
@@ -268,12 +262,9 @@ class Utf8Decoder {
       offset += result.byteLength
     }
     return count
-  }
+  },
 
-  public static getCodePointAt(
-    bytes: Uint8Array,
-    index: number,
-  ): rune | undefined {
+  getCodePointAt(bytes: Uint8Array, index: number): rune | undefined {
     let currentIndex = 0
     let offset = 0
     while (offset < bytes.length) {
@@ -288,7 +279,7 @@ class Utf8Decoder {
       offset += result.byteLength
     }
     return undefined
-  }
+  },
 }
 
 const enc = new TextEncoder("utf-8")
@@ -318,7 +309,7 @@ const litCache = {
   },
 }
 
-export function u(rawLits: TemplateStringsArray, ...interps: utf8[]) {
+export function u(rawLits: TemplateStringsArray, ...interps: utf8[]): utf8 {
   const lits = rawLits.map((lit) => {
     const cached = litCache.lookup(lit)
     if (cached instanceof TypeError) throw new Utf8DecodingError(cached)
@@ -356,6 +347,7 @@ export function u(rawLits: TemplateStringsArray, ...interps: utf8[]) {
   return new utf8(UTF8_CONSTRUCTOR_GUARD, resultBuf, totalLen)
 }
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 class utf8 {
   /** @internal */
   public readonly [UTF8_BRAND] = true
@@ -434,7 +426,7 @@ class utf8 {
   }
 
   public runes(): BackSizeIter<rune> {
-    return Iter.from(Utf8Decoder.iterateCodePoints(this.buffer, this.length))
+    return Iter.from(utf8Decoder.iterateCodePoints(this.buffer, this.length))
   }
 
   public bytes(): BackSizeIter<number> {
@@ -475,7 +467,8 @@ class utf8 {
 
     let offset = 0
     for (let i = 0; i < start; i++) {
-      offset += Utf8Decoder.decodeCodePoint(this.buffer, offset)!.byteLength
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      offset += utf8Decoder.decodeCodePoint(this.buffer, offset)!.byteLength
     }
 
     if (end === undefined || this.length <= end) {
@@ -488,7 +481,8 @@ class utf8 {
 
     let offsetEnd = offset
     for (let i = start; i < end; i++) {
-      offsetEnd += Utf8Decoder.decodeCodePoint(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      offsetEnd += utf8Decoder.decodeCodePoint(
         this.buffer,
         offsetEnd,
       )!.byteLength
@@ -502,7 +496,7 @@ class utf8 {
   }
 
   public runeAt(index: number): rune | undefined {
-    return Utf8Decoder.getCodePointAt(this.buffer, index)
+    return utf8Decoder.getCodePointAt(this.buffer, index)
   }
 
   public charAt(index: number): string | undefined {

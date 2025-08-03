@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest"
 import { Iter, BackIter, SizeIter, BackSizeIter } from "../src/iter"
+
 import * as compat from "@cantrip/compat/iter"
 
 describe("Compat Integration", () => {
@@ -220,24 +221,34 @@ describe("Compat Integration", () => {
   describe("third-party integration", () => {
     test("can monkey-patch third-party data structure for Iter", () => {
       class ThirdPartyList<T> {
-        private items: T[] = []
+        private readonly items: T[] = []
 
-        add(item: T): void {
+        public add(item: T): void {
           this.items.push(item)
         }
 
         // Monkey-patch compat integration
-        [Symbol.iterator]() {
-          return this[compat.ITERATOR]()
+        public [Symbol.iterator](): Iterator<T> {
+          let items = this.items
+          let index = 0
+          return {
+            next(): IteratorResult<T> {
+              if (index < items.length) {
+                return { done: false, value: items[index++] }
+              }
+              return { done: true, value: undefined }
+            },
+          }
         }
 
-        [compat.ITERATOR]() {
+        public [compat.ITERATOR](): compat.Iterator<T> {
+          let items = this.items
           let index = 0
           return {
             [compat.IS_ITERATOR]: true as const,
-            next: () => {
-              if (index < this.items.length) {
-                return { done: false, value: this.items[index++] }
+            next(): compat.IteratorResult<T> {
+              if (index < items.length) {
+                return { done: false, value: items[index++] }
               }
               return { done: true, value: undefined }
             },
@@ -245,7 +256,7 @@ describe("Compat Integration", () => {
         }
       }
 
-      const list = new ThirdPartyList<number>()
+      const list: ThirdPartyList<number> = new ThirdPartyList()
       list.add(1)
       list.add(2)
       list.add(3)
@@ -261,41 +272,52 @@ describe("Compat Integration", () => {
 
     test("can monkey-patch third-party data structure for BackIter", () => {
       class ThirdPartyDeque<T> {
-        private items: T[] = []
+        private readonly items: T[] = []
 
-        push(item: T): void {
+        public push(item: T): void {
           this.items.push(item)
         }
 
         // Monkey-patch compat integration for bidirectional iteration
-        [Symbol.iterator]() {
-          return this[compat.ITERATOR]()
-        }
-
-        [compat.ITERATOR]() {
+        public [Symbol.iterator](): Iterator<T> {
+          let items = this.items
           let frontIndex = 0
           let backIndex = this.items.length - 1
           return {
-            [compat.IS_ITERATOR]: true as const,
-            [compat.NEXT_BACK]: () => {
+            next(): IteratorResult<T> {
               if (frontIndex <= backIndex) {
-                return { done: false, value: this.items[backIndex--] }
-              }
-              return { done: true, value: undefined }
-            },
-            next: () => {
-              if (frontIndex <= backIndex) {
-                return { done: false, value: this.items[frontIndex++] }
+                return { done: false, value: items[frontIndex++] }
               }
               return { done: true, value: undefined }
             },
           }
         }
 
-        [compat.IS_BACK_ITERABLE] = true as const
+        public [compat.ITERATOR](): compat.BackIterator<T> {
+          let items = this.items
+          let frontIndex = 0
+          let backIndex = this.items.length - 1
+          return {
+            [compat.IS_ITERATOR]: true as const,
+            [compat.NEXT_BACK](): compat.IteratorResult<T> {
+              if (frontIndex <= backIndex) {
+                return { done: false, value: items[backIndex--] }
+              }
+              return { done: true, value: undefined }
+            },
+            next(): compat.IteratorResult<T> {
+              if (frontIndex <= backIndex) {
+                return { done: false, value: items[frontIndex++] }
+              }
+              return { done: true, value: undefined }
+            },
+          }
+        }
+
+        public readonly [compat.IS_BACK_ITERABLE] = true as const
       }
 
-      const deque = new ThirdPartyDeque<number>()
+      const deque: ThirdPartyDeque<number> = new ThirdPartyDeque()
       deque.push(1)
       deque.push(2)
       deque.push(3)
@@ -311,39 +333,51 @@ describe("Compat Integration", () => {
 
     test("can monkey-patch third-party data structure for SizeIter", () => {
       class ThirdPartyArray<T> {
-        private items: T[] = []
+        private readonly items: T[] = []
 
-        push(item: T): void {
+        public push(item: T): void {
           this.items.push(item)
         }
 
-        get length(): number {
+        public get length(): number {
           return this.items.length
         }
 
         // Monkey-patch compat integration for size tracking
-        [Symbol.iterator]() {
-          return this[compat.ITERATOR]()
-        }
-
-        [compat.ITERATOR]() {
+        public [Symbol.iterator](): Iterator<T> {
+          let items = this.items
           let index = 0
           return {
-            [compat.IS_ITERATOR]: true as const,
-            [compat.SIZE]: () => Math.max(0, this.items.length - index),
-            next: () => {
-              if (index < this.items.length) {
-                return { done: false, value: this.items[index++] }
+            next(): IteratorResult<T> {
+              if (index < items.length) {
+                return { done: false, value: items[index++] }
               }
               return { done: true, value: undefined }
             },
           }
         }
 
-        [compat.IS_SIZE_ITERABLE] = true as const
+        public [compat.ITERATOR](): compat.SizeIterator<T> {
+          let items = this.items
+          let index = 0
+          return {
+            [compat.IS_ITERATOR]: true as const,
+            [compat.SIZE](): number {
+              return Math.max(0, items.length - index)
+            },
+            next(): compat.IteratorResult<T> {
+              if (index < items.length) {
+                return { done: false, value: items[index++] }
+              }
+              return { done: true, value: undefined }
+            },
+          }
+        }
+
+        public readonly [compat.IS_SIZE_ITERABLE] = true as const
       }
 
-      const array = new ThirdPartyArray<number>()
+      const array: ThirdPartyArray<number> = new ThirdPartyArray()
       array.push(1)
       array.push(2)
       array.push(3)
@@ -363,47 +397,60 @@ describe("Compat Integration", () => {
 
     test("can monkey-patch third-party data structure for BackSizeIter", () => {
       class ThirdPartyVector<T> {
-        private items: T[] = []
+        private readonly items: T[] = []
 
-        push(item: T): void {
+        public push(item: T): void {
           this.items.push(item)
         }
 
-        get length(): number {
+        public get length(): number {
           return this.items.length
         }
 
         // Monkey-patch compat integration for bidirectional size tracking
-        [Symbol.iterator]() {
-          return this[compat.ITERATOR]()
-        }
-
-        [compat.ITERATOR]() {
+        public [Symbol.iterator](): Iterator<T> {
+          let items = this.items
           let frontIndex = 0
           let backIndex = this.items.length - 1
           return {
-            [compat.IS_ITERATOR]: true as const,
-            [compat.NEXT_BACK]: () => {
+            next(): IteratorResult<T> {
               if (frontIndex <= backIndex) {
-                return { done: false, value: this.items[backIndex--] }
-              }
-              return { done: true, value: undefined }
-            },
-            [compat.SIZE]: () => Math.max(0, backIndex - frontIndex + 1),
-            next: () => {
-              if (frontIndex <= backIndex) {
-                return { done: false, value: this.items[frontIndex++] }
+                return { done: false, value: items[frontIndex++] }
               }
               return { done: true, value: undefined }
             },
           }
         }
 
-        [compat.IS_BACK_ITERABLE] = true as const;
-        [compat.IS_SIZE_ITERABLE] = true as const
+        public [compat.ITERATOR](): compat.BackSizeIterator<T> {
+          let items = this.items
+          let frontIndex = 0
+          let backIndex = this.items.length - 1
+          return {
+            [compat.IS_ITERATOR]: true as const,
+            [compat.NEXT_BACK](): compat.IteratorResult<T> {
+              if (frontIndex <= backIndex) {
+                return { done: false, value: items[backIndex--] }
+              }
+              return { done: true, value: undefined }
+            },
+            [compat.SIZE]() {
+              return Math.max(0, backIndex - frontIndex + 1)
+            },
+            next(): compat.IteratorResult<T> {
+              if (frontIndex <= backIndex) {
+                return { done: false, value: items[frontIndex++] }
+              }
+              return { done: true, value: undefined }
+            },
+          }
+        }
+
+        public readonly [compat.IS_BACK_ITERABLE] = true as const
+        public readonly [compat.IS_SIZE_ITERABLE] = true as const
       }
 
-      const vector = new ThirdPartyVector<number>()
+      const vector: ThirdPartyVector<number> = new ThirdPartyVector()
       vector.push(1)
       vector.push(2)
       vector.push(3)
