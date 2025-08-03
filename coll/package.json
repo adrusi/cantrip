@@ -6,7 +6,8 @@
   "private": true,
   "dependencies": {
     "@cantrip/compat": "0.1.0",
-    "@cantrip/iter": "0.1.0"
+    "@cantrip/iter": "0.1.0",
+    "@cantrip/core": "0.1.0"
   },
   "devDependencies": {},
   "peerDependencies": {

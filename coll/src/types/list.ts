@@ -27,7 +27,9 @@ type _AbstactListExtendsAbstractColl = Test<
   >
 >
 
-export interface AbstractList<A> extends iterCompat.BackSizeIterable<A> {
+export interface AbstractList<A>
+  extends Iterable<A>,
+    iterCompat.BackSizeIterable<A> {
   readonly [IS_ABSTRACT_COLL]: true
   size(): number
   iter(): BackSizeIter<A>

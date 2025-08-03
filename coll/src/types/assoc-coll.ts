@@ -22,22 +22,15 @@ export const IS_DICT = Symbol("IS_DICT")
 export const IS_DICT_P = Symbol("IS_DICT_P")
 export const IS_DICT_MUT = Symbol("IS_DICT_MUT")
 
-export type DefaultFor<V> = undefined extends V ? typeof NOT_PRESENT : undefined
-
-export type DefaultBoundFor<V> = undefined extends V ? symbol : undefined
-
 type _AbstactDictExtendsAbstractColl = Test<
   Assert<
-    AbstractDict<"K", "V"> extends AbstractColl<["K", "V"]> ? true : false,
+    AbstractAssocColl<"K", "V"> extends AbstractColl<["K", "V"]> ? true : false,
     "AbstactDict<K, V> should extend AbstractColl<[K, V]>"
   >
 >
 
-export interface AbstractDict<
-  K,
-  V,
-  Default extends DefaultBoundFor<V> = DefaultFor<V>,
-> extends Iterable<[K, V]>,
+export interface AbstractAssocColl<K, V, Default>
+  extends Iterable<[K, V]>,
     iterCompat.SizeIterable<[K, V]> {
   readonly [IS_ABSTRACT_COLL]: true
   size(): number
@@ -56,7 +49,7 @@ type _DictExtendsColl = Test<
 >
 
 export interface Dict<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>
-  extends AbstractDict<K, V, Default>,
+  extends AbstractAssocColl<K, V, Default>,
     coreCompat.Eq,
     coreCompat.Hashable {
   readonly [IS_COLL]: true
@@ -93,7 +86,7 @@ export interface DictMut<
   K,
   V,
   Default extends DefaultBoundFor<V> = DefaultFor<V>,
-> extends AbstractDict<K, V, Default> {
+> extends AbstractAssocColl<K, V, Default> {
   readonly [IS_COLL_MUT]: true
   add(entry: [K, V]): void
   addMany(entries: IterableOrIterator<[K, V]>): void
@@ -105,7 +98,7 @@ export interface DictMut<
 
 export function isAbstractDict(
   value: unknown,
-): value is AbstractDict<unknown, unknown> {
+): value is AbstractAssocColl<unknown, unknown> {
   return (
     (typeof value === "object" || typeof value === "function") &&
     value !== null &&

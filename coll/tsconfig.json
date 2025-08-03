@@ -4,6 +4,7 @@
     "paths": {
       "@cantrip/compat/iter": ["../compat/src/iter.ts"],
       "@cantrip/compat/core": ["../compat/src/core.ts"],
+      "@cantrip/core": ["../core/src/mod.ts"],
       "@cantrip/iter": ["../iter/src/mod.ts"],
       "@cantrip/typelevel": ["../typelevel/src/mod.ts"]
     }

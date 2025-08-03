@@ -8,7 +8,7 @@ export const IS_COLL = Symbol("IS_COLL")
 export const IS_COLL_P = Symbol("IS_COLL_P")
 export const IS_COLL_MUT = Symbol("IS_COLL_MUT")
 
-export interface AbstractColl<A> extends iterCompat.Iterable<A> {
+export interface AbstractColl<A> extends Iterable<A>, iterCompat.Iterable<A> {
   readonly [IS_ABSTRACT_COLL]: true
   size(): number
   iter(): Iter<A>
