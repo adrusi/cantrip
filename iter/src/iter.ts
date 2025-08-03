@@ -27,6 +27,20 @@ export type IterFromReturn<It extends IterableOrIterator<unknown>> = It extends
           ? Iter<A>
           : never
 
+export type NextType<It extends IterableOrIterator<unknown>> = It extends
+  | compat.BackSizeIterable<infer A>
+  | compat.BackSizeIterator<infer A>
+  ? A
+  : It extends compat.SizeIterable<infer A> | compat.SizeIterator<infer A>
+    ? A
+    : It extends compat.BackIterable<infer A> | compat.BackIterator<infer A>
+      ? A
+      : It extends compat.Iterable<infer A> | compat.Iterator<infer A>
+        ? A
+        : It extends Iterable<infer A> | Iterator<infer A>
+          ? A
+          : never
+
 function asIterator<A>(src: IterableOrIterator<A>): Iterator<A> {
   if (compat.isIterable(src)) return src[compat.ITERATOR]()
   if (compat.isStdIterable(src)) return src[Symbol.iterator]()
@@ -172,10 +186,12 @@ export abstract class Iter<A>
     })()
   }
 
-  public flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
-    return new (class extends Iter<B> {
+  public flatMap<BIter extends IterableOrIterator<unknown>>(
+    f: (a: A) => BIter,
+  ): Iter<NextType<BIter>> {
+    return new (class extends Iter<NextType<BIter>> {
       private readonly aSrc: Iter<A>
-      private bSrc: Iterator<B> | null
+      private bSrc: Iterator<NextType<BIter>> | null
 
       public constructor(src: Iter<A>) {
         super()
@@ -183,13 +199,13 @@ export abstract class Iter<A>
         this.bSrc = null
       }
 
-      public next(): compat.IteratorResult<B> {
+      public next(): compat.IteratorResult<NextType<BIter>> {
         while (true) {
           if (this.bSrc === null) {
             const { done, value } = this.aSrc.next()
             if (done) return { done: true, value: undefined }
 
-            this.bSrc = asIterator(f(value))
+            this.bSrc = asIterator(f(value)) as Iterator<NextType<BIter>>
           }
 
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -436,9 +452,9 @@ export abstract class BackIter<A>
     IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
   >(f: (a: A) => IterB): BackIter<B>
 
-  public override flatMap<B, IterB extends IterableOrIterator<B>>(
+  public override flatMap<IterB extends IterableOrIterator<unknown>>(
     f: (a: A) => IterB,
-  ): Iter<B>
+  ): Iter<NextType<IterB>>
 
   public override flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
     let state: FlatMapStateBack<A, B> = {
@@ -861,9 +877,9 @@ export abstract class BackSizeIter<A>
     IterB extends compat.BackIterator<B> | compat.BackIterable<B>,
   >(f: (a: A) => IterB): BackIter<B>
 
-  public override flatMap<B, IterB extends IterableOrIterator<B>>(
+  public override flatMap<IterB extends IterableOrIterator<unknown>>(
     f: (a: A) => IterB,
-  ): BackIter<B>
+  ): BackIter<NextType<IterB>>
 
   public override flatMap<B>(f: (a: A) => IterableOrIterator<B>): Iter<B> {
     return BackIter.prototype.flatMap.call(this, f) as Iter<B>
