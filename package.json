@@ -11,6 +11,7 @@
     "iter",
     "scope",
     "text",
+    "coll",
     "babel-plugin-transform-scope",
     "typescript-eslint-rule-await-all-promises"
   ],

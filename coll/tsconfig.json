@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@cantrip/compat/iter": ["../compat/src/iter.ts"],
+      "@cantrip/iter": ["../iter/src/mod.ts"]
+    }
+  }
+}
