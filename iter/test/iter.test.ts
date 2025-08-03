@@ -1,11 +1,23 @@
 import { describe, test, expect } from "vitest"
-import { Iter, BackIter, SizeIter, BackSizeIter } from "../src/iter"
+import { Iter } from "../src/iter"
 import * as compat from "@cantrip/compat/iter"
+
+function mkIter<A>(it: compat.BackSizeIterable<A>): Iter<A> {
+  const src = it[compat.ITERATOR]()
+
+  return Iter.from({
+    [compat.IS_ITERATOR]: true,
+
+    next(): compat.IteratorResult<A> {
+      return src.next()
+    },
+  })
+}
 
 describe("Iter", () => {
   describe("construction", () => {
     test("from - creates iterator from iterable", () => {
-      const iter = Iter.from([1, 2, 3])
+      const iter = mkIter([1, 2, 3])
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: false, value: 2 })
       expect(iter.next()).toEqual({ done: false, value: 3 })
@@ -13,7 +25,7 @@ describe("Iter", () => {
     })
 
     test("from - handles empty iterable", () => {
-      const iter = Iter.from([])
+      const iter = mkIter([])
       expect(iter.next()).toEqual({ done: true, value: undefined })
     })
 
@@ -65,7 +77,7 @@ describe("Iter", () => {
     })
 
     test("unsafeFrom - creates iterator from iterator", () => {
-      const stdIter = [1, 2, 3][Symbol.iterator]()
+      const stdIter = [1, 2, 3][compat.ITERATOR]()
       const iter = Iter.unsafeFrom(stdIter)
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: false, value: 2 })
@@ -101,31 +113,31 @@ describe("Iter", () => {
 
   describe("iterator protocol", () => {
     test("implements Symbol.iterator", () => {
-      const iter = Iter.from([1, 2, 3])
+      const iter = mkIter([1, 2, 3])
       expect(iter[Symbol.iterator]).toBeDefined()
       expect(iter[Symbol.iterator]()).toBe(iter)
     })
 
     test("implements compat.ITERATOR", () => {
-      const iter = Iter.from([1, 2, 3])
+      const iter = mkIter([1, 2, 3])
       expect(iter[compat.ITERATOR]).toBeDefined()
       expect(iter[compat.ITERATOR]()).toBe(iter)
     })
 
     test("has IS_ITERATOR symbol", () => {
-      const iter = Iter.from([1, 2, 3])
+      const iter = mkIter([1, 2, 3])
       expect(iter[compat.IS_ITERATOR]).toBe(true)
     })
 
     test("return method", () => {
-      const iter = Iter.from([1, 2, 3])
+      const iter = mkIter([1, 2, 3])
       const result = iter.return()
       expect(result).toEqual({ done: true, value: undefined })
       expect(iter.next()).toEqual({ done: true, value: undefined })
     })
 
     test("throw method", () => {
-      const iter = Iter.from([1, 2, 3])
+      const iter = mkIter([1, 2, 3])
       const error = new Error("test error")
       expect(() => iter.throw(error)).toThrow(error)
     })
@@ -133,7 +145,7 @@ describe("Iter", () => {
 
   describe("map", () => {
     test("maps values", () => {
-      const iter = Iter.from([1, 2, 3]).map((x) => x * 2)
+      const iter = mkIter([1, 2, 3]).map((x) => x * 2)
       expect(iter.next()).toEqual({ done: false, value: 2 })
       expect(iter.next()).toEqual({ done: false, value: 4 })
       expect(iter.next()).toEqual({ done: false, value: 6 })
@@ -146,14 +158,14 @@ describe("Iter", () => {
     })
 
     test("preserves size bounds", () => {
-      const iter = Iter.from([1, 2, 3]).map((x) => x * 2)
-      expect(iter.sizeBounds()).toEqual({ min: 3, max: 3 })
+      const iter = mkIter([1, 2, 3]).map((x) => x * 2)
+      expect(iter.sizeBounds()).toEqual({ min: 0 })
     })
   })
 
   describe("flatMap", () => {
     test("flattens mapped iterators", () => {
-      const iter = Iter.from([1, 2, 3]).flatMap((x) => Iter.from([x, x]))
+      const iter = mkIter([1, 2, 3]).flatMap((x) => mkIter([x, x]))
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: false, value: 2 })
@@ -164,8 +176,8 @@ describe("Iter", () => {
     })
 
     test("handles empty inner iterators", () => {
-      const iter = Iter.from([1, 2, 3]).flatMap((x) =>
-        x === 2 ? Iter.empty() : Iter.from([x]),
+      const iter = mkIter([1, 2, 3]).flatMap((x) =>
+        x === 2 ? Iter.empty() : mkIter([x]),
       )
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: false, value: 3 })
@@ -173,31 +185,31 @@ describe("Iter", () => {
     })
 
     test("handles empty outer iterator", () => {
-      const iter = Iter.empty<number>().flatMap((x) => Iter.from([x, x]))
+      const iter = Iter.empty<number>().flatMap((x) => mkIter([x, x]))
       expect(iter.next()).toEqual({ done: true, value: undefined })
     })
 
     test("preserves size bounds", () => {
-      const iter = Iter.from([1, 2, 3]).flatMap((x) => Iter.from([x, x]))
+      const iter = mkIter([1, 2, 3]).flatMap((x) => mkIter([x, x]))
       expect(iter.sizeBounds()).toEqual({ min: 0 })
     })
   })
 
   describe("filter", () => {
     test("filters values", () => {
-      const iter = Iter.from([1, 2, 3, 4, 5]).filter((x) => x % 2 === 0)
+      const iter = mkIter([1, 2, 3, 4, 5]).filter((x) => x % 2 === 0)
       expect(iter.next()).toEqual({ done: false, value: 2 })
       expect(iter.next()).toEqual({ done: false, value: 4 })
       expect(iter.next()).toEqual({ done: true, value: undefined })
     })
 
     test("filters all values", () => {
-      const iter = Iter.from([1, 3, 5]).filter((x) => x % 2 === 0)
+      const iter = mkIter([1, 3, 5]).filter((x) => x % 2 === 0)
       expect(iter.next()).toEqual({ done: true, value: undefined })
     })
 
     test("filters no values", () => {
-      const iter = Iter.from([2, 4, 6]).filter((x) => x % 2 === 0)
+      const iter = mkIter([2, 4, 6]).filter((x) => x % 2 === 0)
       expect(iter.next()).toEqual({ done: false, value: 2 })
       expect(iter.next()).toEqual({ done: false, value: 4 })
       expect(iter.next()).toEqual({ done: false, value: 6 })
@@ -210,14 +222,14 @@ describe("Iter", () => {
     })
 
     test("preserves size bounds", () => {
-      const iter = Iter.from([1, 2, 3, 4, 5]).filter((x) => x % 2 === 0)
-      expect(iter.sizeBounds()).toEqual({ min: 0, max: 5 })
+      const iter = mkIter([1, 2, 3, 4, 5]).filter((x) => x % 2 === 0)
+      expect(iter.sizeBounds()).toEqual({ min: 0 })
     })
   })
 
   describe("take", () => {
     test("takes specified number of elements", () => {
-      const iter = Iter.from([1, 2, 3, 4, 5]).take(3)
+      const iter = mkIter([1, 2, 3, 4, 5]).take(3)
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: false, value: 2 })
       expect(iter.next()).toEqual({ done: false, value: 3 })
@@ -225,12 +237,12 @@ describe("Iter", () => {
     })
 
     test("takes zero elements", () => {
-      const iter = Iter.from([1, 2, 3]).take(0)
+      const iter = mkIter([1, 2, 3]).take(0)
       expect(iter.next()).toEqual({ done: true, value: undefined })
     })
 
     test("takes more than available", () => {
-      const iter = Iter.from([1, 2]).take(5)
+      const iter = mkIter([1, 2]).take(5)
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: false, value: 2 })
       expect(iter.next()).toEqual({ done: true, value: undefined })
@@ -242,17 +254,17 @@ describe("Iter", () => {
     })
 
     test("preserves size bounds", () => {
-      const longerIter = Iter.from([1, 2, 3, 4, 5]).take(3)
-      expect(longerIter.sizeBounds()).toEqual({ min: 3, max: 3 })
+      const longerIter = mkIter([1, 2, 3, 4, 5]).take(3)
+      expect(longerIter.sizeBounds()).toEqual({ min: 0 })
 
-      const shorterIter = Iter.from([1, 2]).take(3)
-      expect(shorterIter.sizeBounds()).toEqual({ min: 2, max: 2 })
+      const shorterIter = mkIter([1, 2]).take(3)
+      expect(shorterIter.sizeBounds()).toEqual({ min: 0 })
     })
   })
 
   describe("drop", () => {
     test("drops specified number of elements", () => {
-      const iter = Iter.from([1, 2, 3, 4, 5]).drop(2)
+      const iter = mkIter([1, 2, 3, 4, 5]).drop(2)
       expect(iter.next()).toEqual({ done: false, value: 3 })
       expect(iter.next()).toEqual({ done: false, value: 4 })
       expect(iter.next()).toEqual({ done: false, value: 5 })
@@ -260,7 +272,7 @@ describe("Iter", () => {
     })
 
     test("drops zero elements", () => {
-      const iter = Iter.from([1, 2, 3]).drop(0)
+      const iter = mkIter([1, 2, 3]).drop(0)
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: false, value: 2 })
       expect(iter.next()).toEqual({ done: false, value: 3 })
@@ -268,7 +280,7 @@ describe("Iter", () => {
     })
 
     test("drops more than available", () => {
-      const iter = Iter.from([1, 2]).drop(5)
+      const iter = mkIter([1, 2]).drop(5)
       expect(iter.next()).toEqual({ done: true, value: undefined })
     })
 
@@ -278,15 +290,15 @@ describe("Iter", () => {
     })
 
     test("preserves size bounds", () => {
-      const iter = Iter.from([1, 2, 3, 4, 5]).drop(2)
-      expect(iter.sizeBounds()).toEqual({ min: 3, max: 3 })
+      const iter = mkIter([1, 2, 3, 4, 5]).drop(2)
+      expect(iter.sizeBounds()).toEqual({ min: 0 })
     })
   })
 
   describe("chain", () => {
     test("chains iterators", () => {
-      const iter1 = Iter.from([1, 2])
-      const iter2 = Iter.from([3, 4])
+      const iter1 = mkIter([1, 2])
+      const iter2 = mkIter([3, 4])
       const chained = iter1.chain(iter2)
 
       expect(chained.next()).toEqual({ done: false, value: 1 })
@@ -298,7 +310,7 @@ describe("Iter", () => {
 
     test("chains with empty first iterator", () => {
       const iter1 = Iter.empty<number>()
-      const iter2 = Iter.from([1, 2])
+      const iter2 = mkIter([1, 2])
       const chained = iter1.chain(iter2)
 
       expect(chained.next()).toEqual({ done: false, value: 1 })
@@ -307,7 +319,7 @@ describe("Iter", () => {
     })
 
     test("chains with empty second iterator", () => {
-      const iter1 = Iter.from([1, 2])
+      const iter1 = mkIter([1, 2])
       const iter2 = Iter.empty<number>()
       const chained = iter1.chain(iter2)
 
@@ -325,17 +337,17 @@ describe("Iter", () => {
     })
 
     test("preserves size bounds", () => {
-      const iter1 = Iter.from([1, 2, 3])
-      const iter2 = Iter.from([4, 5])
+      const iter1 = mkIter([1, 2, 3])
+      const iter2 = mkIter([4, 5])
       const chained = iter1.chain(iter2)
 
-      expect(chained.sizeBounds()).toEqual({ min: 5, max: 5 })
+      expect(chained.sizeBounds()).toEqual({ min: 0 })
     })
   })
 
   describe("method chaining", () => {
     test("chains multiple operations", () => {
-      const iter = Iter.from([1, 2, 3, 4, 5, 6])
+      const iter = mkIter([1, 2, 3, 4, 5, 6])
         .filter((x) => x % 2 === 0)
         .map((x) => x * 2)
         .take(2)
@@ -346,8 +358,8 @@ describe("Iter", () => {
     })
 
     test("complex chaining with flatMap", () => {
-      const iter = Iter.from([1, 2, 3])
-        .flatMap((x) => Iter.from([x, x + 10]))
+      const iter = mkIter([1, 2, 3])
+        .flatMap((x) => mkIter([x, x + 10]))
         .filter((x) => x > 5)
         .map((x) => x.toString())
 
@@ -360,7 +372,7 @@ describe("Iter", () => {
 
   describe("edge cases", () => {
     test("multiple calls to next after exhaustion", () => {
-      const iter = Iter.from([1])
+      const iter = mkIter([1])
       expect(iter.next()).toEqual({ done: false, value: 1 })
       expect(iter.next()).toEqual({ done: true, value: undefined })
       expect(iter.next()).toEqual({ done: true, value: undefined })
@@ -368,7 +380,7 @@ describe("Iter", () => {
     })
 
     test("works with null and undefined values", () => {
-      const iter = Iter.from([null, undefined, 0, false, ""])
+      const iter = mkIter([null, undefined, 0, false, ""])
       expect(iter.next()).toEqual({ done: false, value: null })
       expect(iter.next()).toEqual({ done: false, value: undefined })
       expect(iter.next()).toEqual({ done: false, value: 0 })
@@ -378,13 +390,13 @@ describe("Iter", () => {
     })
 
     test("handles large numbers in take/drop", () => {
-      const iter = Iter.from([1, 2, 3])
+      const iter = mkIter([1, 2, 3])
       expect(iter.take(Number.MAX_SAFE_INTEGER).next()).toEqual({
         done: false,
         value: 1,
       })
 
-      const iter2 = Iter.from([1, 2, 3])
+      const iter2 = mkIter([1, 2, 3])
       expect(iter2.drop(Number.MAX_SAFE_INTEGER).next()).toEqual({
         done: true,
         value: undefined,

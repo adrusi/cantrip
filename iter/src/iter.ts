@@ -21,9 +21,11 @@ export type IterFromReturn<It extends IterableOrIterator<unknown>> = It extends
     ? SizeIter<A>
     : It extends compat.BackIterable<infer A> | compat.BackIterator<infer A>
       ? BackIter<A>
-      : It extends Iterable<infer A> | Iterator<infer A>
+      : It extends compat.Iterable<infer A> | compat.Iterator<infer A>
         ? Iter<A>
-        : never
+        : It extends Iterable<infer A> | Iterator<infer A>
+          ? Iter<A>
+          : never
 
 function asIterator<A>(src: IterableOrIterator<A>): Iterator<A> {
   if (compat.isIterable(src)) return src[compat.ITERATOR]()
@@ -192,7 +194,10 @@ export abstract class Iter<A>
 
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const { done, value } = this.bSrc.next()
-          if (done) continue
+          if (done) {
+            this.bSrc = null
+            continue
+          }
 
           return { done: false, value }
         }
