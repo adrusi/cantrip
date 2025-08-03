@@ -5,11 +5,10 @@
   "type": "module",
   "exports": {
     "./iter": "./src/iter.ts",
-    "./iter/async": "./src/iter-async.ts"
+    "./iter/async": "./src/iter-async.ts",
+    "./core": "./src/core.ts"
   },
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
+  "devDependencies": {},
   "peerDependencies": {
     "typescript": "^5.4.0"
   }

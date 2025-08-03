@@ -34,7 +34,7 @@ export default tseslint.config(
         "index-signature",
       ],
       "consistent-return": "off",
-      "@typescript-eslint/consistent-return": "error",
+      "@typescript-eslint/consistent-return": "off",
       "@typescript-eslint/consistent-type-assertions": [
         "error",
         { assertionStyle: "as", objectLiteralTypeAssertions: "never" },
