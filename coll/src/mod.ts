@@ -45,3 +45,5 @@ export {
 
 export { ListP, ListMut } from "./list"
 export { DictP, DictMut } from "./dict"
+
+export { ArrayList } from "./list/array-list"

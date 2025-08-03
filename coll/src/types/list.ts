@@ -89,7 +89,8 @@ export interface ListMut<A> extends AbstractList<A> {
   slice(start?: number, end?: number): ListMut<A>
   set(index: number, value: A): void
   push(value: A): void
-  append(values: A): void
+  append(values: IterableOrIterator<A>): void
+  clone(): ListMut<A>
 }
 
 export function isAbstractList(value: unknown): value is AbstractList<unknown> {

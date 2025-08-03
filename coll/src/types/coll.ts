@@ -32,6 +32,7 @@ export interface CollMut<A> extends AbstractColl<A> {
   readonly [IS_COLL_MUT]: true
   add(entry: A): void
   addMany(entries: IterableOrIterator<A>): void
+  clone(): CollMut<A>
 }
 
 export function isAbstractColl(value: unknown): value is AbstractColl<unknown> {

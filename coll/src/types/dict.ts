@@ -99,6 +99,7 @@ export interface DictMut<
 
   readonly [IS_DICT_MUT]: true
   set(key: K, value: V): void
+  clone(): DictMut<K, V, Default>
 }
 
 export function isAbstractDict(
