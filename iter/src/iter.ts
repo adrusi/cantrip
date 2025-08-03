@@ -563,7 +563,7 @@ export abstract class BackIter<A>
         let { done, value } = this.srcs[srcName].nextBack()
         if (done) {
           this.srcs[srcName] = null
-          return this.next()
+          return this.nextBack()
         }
 
         return { done: false, value: value as A | B }
@@ -960,7 +960,7 @@ export abstract class BackSizeIter<A>
         let { done, value } = this.srcs[srcName].nextBack()
         if (done) {
           this.srcs[srcName] = null
-          return this.next()
+          return this.nextBack()
         }
 
         return { done: false, value: value as A | B }
@@ -1123,7 +1123,10 @@ function flatMapNextBack<A, B>(
     }
 
     const { done, value } = state.bSrcBack[compat.NEXT_BACK]()
-    if (done) continue
+    if (done) {
+      state.bSrcBack = null
+      continue
+    }
 
     return { done: false, value }
   }
