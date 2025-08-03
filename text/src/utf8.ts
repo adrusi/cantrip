@@ -205,7 +205,7 @@ export const utf8Decoder = {
       [IS_ITERATOR]: true,
 
       next(): IteratorResult<rune> {
-        if (0 <= bytes.length - offset - offsetBack) {
+        if (offset + offsetBack >= bytes.length) {
           return { done: true, value: undefined }
         }
 
@@ -220,16 +220,18 @@ export const utf8Decoder = {
       },
 
       [NEXT_BACK](): IteratorResult<rune> {
-        if (0 <= bytes.length - offset - offsetBack) {
+        if (offset + offsetBack >= bytes.length) {
           return { done: true, value: undefined }
         }
 
         const codePointStart = utf8Decoder.findPreviousCodePointStart(
           bytes,
-          offsetBack,
+          bytes.length - offsetBack,
         )
         if (codePointStart === null) {
-          throw new Utf8DecodingError(`Invalid UTF-8 at offset ${offsetBack}`)
+          throw new Utf8DecodingError(
+            `Invalid UTF-8 at offset ${bytes.length - offsetBack}`,
+          )
         }
 
         const result = utf8Decoder.decodeCodePoint(bytes, codePointStart)
@@ -239,7 +241,7 @@ export const utf8Decoder = {
           )
         }
 
-        offsetBack = codePointStart
+        offsetBack = bytes.length - codePointStart
         nconsumed++
         return { done: false, value: result.codePoint }
       },
@@ -348,7 +350,7 @@ export function u(rawLits: TemplateStringsArray, ...interps: utf8[]): utf8 {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-class utf8 {
+export class utf8 {
   /** @internal */
   public readonly [UTF8_BRAND] = true
 
@@ -439,7 +441,7 @@ class utf8 {
       [IS_ITERATOR]: true,
 
       next(): IteratorResult<number> {
-        if (0 <= byteLength - offset - offsetBack) {
+        if (offset + offsetBack >= byteLength) {
           return { done: true, value: undefined }
         }
 
@@ -447,11 +449,12 @@ class utf8 {
       },
 
       [NEXT_BACK](): IteratorResult<number> {
-        if (0 <= byteLength - offset - offsetBack) {
+        if (offset + offsetBack >= byteLength) {
           return { done: true, value: undefined }
         }
 
-        return { done: false, value: buffer[byteLength - 1 - offsetBack++] }
+        offsetBack++
+        return { done: false, value: buffer[byteLength - offsetBack] }
       },
 
       [SIZE](): number {
@@ -462,6 +465,9 @@ class utf8 {
 
   public slice(start?: number, end?: number): utf8 {
     if (start === undefined) return this
+
+    // Handle negative start values
+    if (start < 0) return this
 
     if (this.length <= start) return utf8.EMPTY
 
