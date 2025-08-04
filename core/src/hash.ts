@@ -2,6 +2,14 @@ import "./patch-std"
 
 import * as compat from "@cantrip/compat/core"
 
+export function smi(hash: number): number {
+  return ((hash >>> 1) & 0x40000000) | (hash & 0xbfffffff)
+}
+
+export function hashMerge(a: number, b: number): number {
+  return a ^ (b + 0x9e3779b9 + (a << 6) + (a >> 2))
+}
+
 export function hash(a: unknown): number {
   switch (typeof a) {
     case "number":
@@ -20,9 +28,9 @@ export function hash(a: unknown): number {
     case "function":
       if (a === null) return NULL_HASH
 
-      if (compat.isHashable(a)) {
+      if (compat.isValue(a)) {
         let hash = a[compat.HASH]()
-        return ((hash >>> 1) & 0x40000000) | (hash & 0xbfffffff)
+        return smi(hash)
       }
 
       return hashObject(a)
@@ -84,7 +92,7 @@ function computeStringHash(a: string): number {
   for (let i = 0; i < a.length; i++) {
     hash = 31 * hash + a.charCodeAt(i)
   }
-  return ((hash >>> 1) & 0x40000000) | (hash & 0xbfffffff)
+  return smi(hash)
 }
 
 let _nextHash = 0

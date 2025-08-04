@@ -1,15 +1,16 @@
-import type * as coreCompat from "@cantrip/compat/core"
+import * as coreCompat from "@cantrip/compat/core"
 import type * as iterCompat from "@cantrip/compat/iter"
 
-import type {
-  AbstractColl,
-  Coll,
-  CollP,
-  CollMut,
-  IS_ABSTRACT_COLL,
-  IS_COLL,
-  IS_COLL_P,
-  IS_COLL_MUT,
+import {
+  type AbstractColl,
+  type Coll,
+  type CollP,
+  type CollMut,
+  type IS_COLL,
+  isAbstractColl_,
+  isColl_,
+  isCollP_,
+  isCollMut_,
 } from "./coll"
 
 import type { Assert, Test } from "@cantrip/typelevel"
@@ -22,114 +23,132 @@ export const IS_DICT = Symbol("IS_DICT")
 export const IS_DICT_P = Symbol("IS_DICT_P")
 export const IS_DICT_MUT = Symbol("IS_DICT_MUT")
 
-type _AbstactDictExtendsAbstractColl = Test<
+type _AbstactAssocCollExtendsAbstractColl = Test<
   Assert<
-    AbstractAssocColl<"K", "V"> extends AbstractColl<["K", "V"]> ? true : false,
-    "AbstactDict<K, V> should extend AbstractColl<[K, V]>"
+    AbstractAssocColl<"K", "V", "Default"> extends AbstractColl ? true : false,
+    "AbstactAssocColl<K, V, Default> should extend AbstractColl"
   >
 >
 
-export interface AbstractAssocColl<K, V, Default>
-  extends Iterable<[K, V]>,
-    iterCompat.SizeIterable<[K, V]> {
-  readonly [IS_ABSTRACT_COLL]: true
+export interface AbstractAssocColl<K, V, Default = never>
+  extends Iterable<unknown>,
+    iterCompat.SizeIterable<unknown> {
+  readonly [IS_COLL]: true
   size(): number
-  iter(): SizeIter<[K, V]>
-
-  readonly [IS_ABSTRACT_DICT]: true
+  iter(): SizeIter<unknown>
+  entries(): SizeIter<[K, V]>
   get(key: K): V | Default
   has(key: K): boolean
 }
 
-type _DictExtendsColl = Test<
+type _AssocCollExtendsColl = Test<
   Assert<
-    Dict<"K", "V"> extends Coll<["K", "V"]> ? true : false,
-    "Dict<K, V> should extend Coll<[K, V]>"
+    AssocColl<"K", "V", "Default"> extends Coll ? true : false,
+    "AssocColl<K, V, Default> should extend Coll"
   >
 >
 
-export interface Dict<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>
+export interface AssocColl<K, V, Default = never>
   extends AbstractAssocColl<K, V, Default>,
-    coreCompat.Eq,
-    coreCompat.Hashable {
-  readonly [IS_COLL]: true
-  asMut(): DictMut<K, V, Default>
-
-  readonly [IS_DICT]: true
+    coreCompat.Value {
+  asMut(): AssocCollMut<K, V, Default>
 }
 
-type _DictPExtendsCollP = Test<
+type _AssocCollPExtendsCollP = Test<
   Assert<
-    DictP<"K", "V"> extends CollP<["K", "V"]> ? true : false,
-    "DictP<K, V> should extend CollP<[K, V]>"
+    AssocCollP<"K", "V", "Default"> extends CollP ? true : false,
+    "AssocCollP<K, V, Default> should extend CollP"
   >
 >
 
-export interface DictP<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>
-  extends Dict<K, V, Default> {
-  readonly [IS_COLL_P]: true
-  conj(value: [K, V]): DictP<K, V, Default>
-  conjMany(entries: IterableOrIterator<[K, V]>): DictP<K, V, Default>
+export interface AssocCollP<K, V, Default = never>
+  extends AssocColl<K, V, Default> {
+  conj(value: never): AssocCollP<K, V, Default>
+  conjMany(entries: IterableOrIterator<never>): AssocCollP<K, V, Default>
 
-  readonly [IS_DICT_P]: true
-  assoc(key: K, value: V): DictP<K, V, Default>
+  assoc(key: K, value: V): AssocCollP<K, V, Default>
 }
 
-type _DictMutExtendsCollMut = Test<
+type _AssocCollMutExtendsCollMut = Test<
   Assert<
-    DictMut<"K", "V"> extends CollMut<["K", "V"]> ? true : false,
-    "DictMut<K, V> should extend CollMut<[K, V]>"
+    AssocCollMut<"K", "V", "Default"> extends CollMut ? true : false,
+    "AssocCollMut<K, V, Default> should extend CollMut"
   >
 >
 
-export interface DictMut<
-  K,
-  V,
-  Default extends DefaultBoundFor<V> = DefaultFor<V>,
-> extends AbstractAssocColl<K, V, Default> {
-  readonly [IS_COLL_MUT]: true
+export interface AssocCollMut<K, V, Default = never>
+  extends AbstractAssocColl<K, V, Default> {
   add(entry: [K, V]): void
   addMany(entries: IterableOrIterator<[K, V]>): void
 
-  readonly [IS_DICT_MUT]: true
   set(key: K, value: V): void
-  clone(): DictMut<K, V, Default>
+  clone(): AssocCollMut<K, V, Default>
 }
 
-export function isAbstractDict(
+export function isAbstractAssocColl_(
+  value: object | ((..._: unknown[]) => unknown),
+): value is AbstractAssocColl<unknown, unknown, unknown> {
+  return (
+    isAbstractColl_(value) &&
+    "entries" in value &&
+    typeof value.entries === "function" &&
+    "get" in value &&
+    typeof value.get === "function" &&
+    "has" in value &&
+    typeof value.has === "function"
+  )
+}
+
+export function isAbstractAssocColl(
   value: unknown,
-): value is AbstractAssocColl<unknown, unknown> {
+): value is AbstractAssocColl<unknown, unknown, unknown> {
   return (
     (typeof value === "object" || typeof value === "function") &&
     value !== null &&
-    IS_ABSTRACT_DICT in value &&
-    value[IS_ABSTRACT_DICT] === true
+    isAbstractAssocColl_(value)
   )
 }
 
-export function isDict(value: unknown): value is Dict<unknown, unknown> {
+export function isAssocColl_(
+  value: AbstractAssocColl<unknown, unknown, unknown> & coreCompat.Value,
+): value is AssocColl<unknown, unknown, unknown> {
+  return isColl_(value)
+}
+
+export function isAssocColl(
+  value: unknown,
+): value is AssocColl<unknown, unknown, unknown> {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    IS_DICT in value &&
-    value[IS_DICT] === true
+    coreCompat.isValue(value) &&
+    isAbstractAssocColl_(value) &&
+    isAssocColl_(value)
   )
 }
 
-export function isDictP(value: unknown): value is DictP<unknown, unknown> {
+export function isAssocCollP_(
+  value: AssocColl<unknown, unknown, unknown>,
+): value is AssocCollP<unknown, unknown, unknown> {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    IS_DICT_P in value &&
-    value[IS_DICT_P] === true
+    isCollP_(value) && "assoc" in value && typeof value.assoc === "function"
   )
 }
 
-export function isDictMut(value: unknown): value is DictMut<unknown, unknown> {
+export function isAssocCollP(
+  value: unknown,
+): value is AssocCollP<unknown, unknown, unknown> {
+  return isAssocColl(value) && isAssocCollP_(value)
+}
+
+export function isAssocCollMut_(
+  value: AbstractAssocColl<unknown, unknown, unknown>,
+): value is AssocCollMut<unknown, unknown, unknown> {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    IS_DICT_MUT in value &&
-    value[IS_DICT_MUT] === true
+    isCollMut_(value) && "assoc" in value && typeof value.assoc === "function"
   )
+}
+
+export function isAssocCollMut(
+  value: unknown,
+): value is AssocCollMut<unknown, unknown, unknown> {
+  return isAbstractAssocColl(value) && isAssocCollMut_(value)
 }

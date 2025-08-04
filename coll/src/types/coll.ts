@@ -1,72 +1,85 @@
-import type * as coreCompat from "@cantrip/compat/core"
-import type * as iterCompat from "@cantrip/compat/iter"
+import * as coreCompat from "@cantrip/compat/core"
+import * as iterCompat from "@cantrip/compat/iter"
 
-import type { Iter, IterableOrIterator } from "@cantrip/iter"
+import type { SizeIter, IterableOrIterator } from "@cantrip/iter"
 
-export const IS_ABSTRACT_COLL = Symbol("IS_ABSTRACT_COLL")
 export const IS_COLL = Symbol("IS_COLL")
-export const IS_COLL_P = Symbol("IS_COLL_P")
-export const IS_COLL_MUT = Symbol("IS_COLL_MUT")
 
-export interface AbstractColl<A> extends Iterable<A>, iterCompat.Iterable<A> {
-  readonly [IS_ABSTRACT_COLL]: true
-  size(): number
-  iter(): Iter<A>
-}
-
-export interface Coll<A>
-  extends AbstractColl<A>,
-    coreCompat.Eq,
-    coreCompat.Hashable {
+export interface AbstractColl
+  extends Iterable<unknown>,
+    iterCompat.Iterable<unknown> {
   readonly [IS_COLL]: true
-  asMut(): CollMut<A>
+  iter(): SizeIter<unknown>
+  size(): number
 }
 
-export interface CollP<A> extends Coll<A> {
-  readonly [IS_COLL_P]: true
-  conj(entry: A): CollP<A>
-  conjMany(entries: IterableOrIterator<A>): CollP<A>
+export interface Coll extends AbstractColl, coreCompat.Value {
+  asMut(): CollMut
 }
 
-export interface CollMut<A> extends AbstractColl<A> {
-  readonly [IS_COLL_MUT]: true
-  add(entry: A): void
-  addMany(entries: IterableOrIterator<A>): void
-  clone(): CollMut<A>
+export interface CollP extends Coll {
+  conj(entry: never): CollP
+  conjMany(entries: IterableOrIterator<never>): CollP
 }
 
-export function isAbstractColl(value: unknown): value is AbstractColl<unknown> {
+export interface CollMut extends AbstractColl {
+  add(entry: never): void
+  addMany(entries: IterableOrIterator<never>): void
+  clone(): CollMut
+}
+
+export function isAbstractColl_(
+  value: object | ((..._: unknown[]) => unknown),
+): value is AbstractColl {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    IS_ABSTRACT_COLL in value &&
-    value[IS_ABSTRACT_COLL] === true
-  )
-}
-
-export function isColl(value: unknown): value is Coll<unknown> {
-  return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
     IS_COLL in value &&
-    value[IS_COLL] === true
+    value[IS_COLL] === true &&
+    iterCompat.isIterable(value) &&
+    "iter" in value &&
+    typeof value.iter === "function" &&
+    "size" in value &&
+    typeof value.size === "function"
   )
 }
 
-export function isCollP(value: unknown): value is CollP<unknown> {
+export function isAbstractColl(value: unknown): value is AbstractColl {
   return (
     (typeof value === "object" || typeof value === "function") &&
     value !== null &&
-    IS_COLL_P in value &&
-    value[IS_COLL_P] === true
+    isAbstractColl_(value)
   )
 }
 
-export function isCollMut(value: unknown): value is CollMut<unknown> {
+export function isColl_(value: AbstractColl & coreCompat.Value): value is Coll {
+  return "asMut" in value && typeof value.asMut === "function"
+}
+
+export function isColl(value: unknown): value is Coll {
+  return coreCompat.isValue(value) && isAbstractColl_(value) && isColl_(value)
+}
+
+export function isCollP_(value: Coll): value is CollP {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    IS_COLL_MUT in value &&
-    value[IS_COLL_MUT] === true
+    "conj" in value &&
+    typeof value.conj === "function" &&
+    "conjMany" in value &&
+    typeof value.conjMany === "function"
   )
+}
+
+export function isCollP(value: unknown): value is CollP {
+  return isColl(value) && isCollP_(value)
+}
+
+export function isCollMut_(value: AbstractColl): value is CollMut {
+  return (
+    "add" in value &&
+    typeof value.add === "function" &&
+    "addMany" in value &&
+    typeof value.addMany === "function"
+  )
+}
+
+export function isCollMut(value: unknown): value is CollMut {
+  return isAbstractColl(value) && isCollMut_(value)
 }
