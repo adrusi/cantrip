@@ -1,26 +1,30 @@
-import type * as coreCompat from "@cantrip/compat/core"
+import * as coreCompat from "@cantrip/compat/core"
 import type * as iterCompat from "@cantrip/compat/iter"
-
-import type {
-  AbstractColl,
-  Coll,
-  CollP,
-  CollMut,
-  IS_ABSTRACT_COLL,
-  IS_COLL,
-  IS_COLL_P,
-  IS_COLL_MUT,
-} from "./coll"
-
+import type { IS_ABSTRACT_ASSOC_COLL } from "./assoc-coll"
+import {
+  type AbstractKeyColl,
+  type KeyColl,
+  type KeyCollP,
+  type KeyCollMut,
+  type IS_ABSTRACT_KEY_COLL,
+} from "./key-coll"
 import type { Assert, Test } from "@cantrip/typelevel"
+import {
+  type IS_ABSTRACT_COLL,
+  type IS_COLL,
+  type IS_COLL_MUT,
+  type IS_COLL_P,
+  type IS_ORDERED,
+  isAbstractColl,
+  isColl,
+  isCollP,
+  isCollMut,
+} from "./coll"
 import type { SizeIter, IterableOrIterator } from "@cantrip/iter"
 
 export const NOT_PRESENT = Symbol("NOT_PRESENT")
 
 export const IS_ABSTRACT_DICT = Symbol("IS_ABSTRACT_DICT")
-export const IS_DICT = Symbol("IS_DICT")
-export const IS_DICT_P = Symbol("IS_DICT_P")
-export const IS_DICT_MUT = Symbol("IS_DICT_MUT")
 
 export type DefaultFor<V> = undefined extends V ? typeof NOT_PRESENT : undefined
 
@@ -28,8 +32,10 @@ export type DefaultBoundFor<V> = undefined extends V ? symbol : undefined
 
 type _AbstactDictExtendsAbstractColl = Test<
   Assert<
-    AbstractDict<"K", "V"> extends AbstractColl<["K", "V"]> ? true : false,
-    "AbstactDict<K, V> should extend AbstractColl<[K, V]>"
+    AbstractDict<"K", "V"> extends AbstractKeyColl<"K", "V", undefined>
+      ? true
+      : false,
+    "AbstactDict<K, V> should extend AbstractKeyColl<K, V, undefined>"
   >
 >
 
@@ -40,35 +46,36 @@ export interface AbstractDict<
 > extends Iterable<[K, V]>,
     iterCompat.SizeIterable<[K, V]> {
   readonly [IS_ABSTRACT_COLL]: true
+  readonly [IS_ORDERED]: boolean
+  readonly [IS_ABSTRACT_ASSOC_COLL]: true
+  readonly [IS_ABSTRACT_KEY_COLL]: true
   size(): number
   iter(): SizeIter<[K, V]>
-
-  readonly [IS_ABSTRACT_DICT]: true
+  entries(): SizeIter<[K, V]>
   get(key: K): V | Default
   has(key: K): boolean
+
+  readonly [IS_ABSTRACT_DICT]: true
 }
 
 type _DictExtendsColl = Test<
   Assert<
-    Dict<"K", "V"> extends Coll<["K", "V"]> ? true : false,
-    "Dict<K, V> should extend Coll<[K, V]>"
+    Dict<"K", "V"> extends KeyColl<"K", "V", undefined> ? true : false,
+    "Dict<K, V> should extend KeyColl<K, V, undefined>"
   >
 >
 
 export interface Dict<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>
   extends AbstractDict<K, V, Default>,
-    coreCompat.Eq,
-    coreCompat.Hashable {
+    coreCompat.Value {
   readonly [IS_COLL]: true
-  asMut(): DictMut<K, V, Default>
-
-  readonly [IS_DICT]: true
+  toMut(): KeyCollMut<K, V, Default>
 }
 
 type _DictPExtendsCollP = Test<
   Assert<
-    DictP<"K", "V"> extends CollP<["K", "V"]> ? true : false,
-    "DictP<K, V> should extend CollP<[K, V]>"
+    DictP<"K", "V"> extends KeyCollP<"K", "V", undefined> ? true : false,
+    "DictP<K, V> should extend CollP<K, V, undefined>"
   >
 >
 
@@ -77,15 +84,19 @@ export interface DictP<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>
   readonly [IS_COLL_P]: true
   conj(value: [K, V]): DictP<K, V, Default>
   conjMany(entries: IterableOrIterator<[K, V]>): DictP<K, V, Default>
-
-  readonly [IS_DICT_P]: true
   assoc(key: K, value: V): DictP<K, V, Default>
+  assocMany(pairs: IterableOrIterator<[K, V]>): DictP<K, V, Default>
+  update(key: K, f: (value: V) => V): DictP<K, V, Default>
+
+  without(key: K): DictP<K, V, Default>
+  withoutMany(keys: IterableOrIterator<K>): DictP<K, V, Default>
+  merge(other: AbstractDict<K, V, Default>): DictP<K, V, Default>
 }
 
 type _DictMutExtendsCollMut = Test<
   Assert<
-    DictMut<"K", "V"> extends CollMut<["K", "V"]> ? true : false,
-    "DictMut<K, V> should extend CollMut<[K, V]>"
+    DictMut<"K", "V"> extends KeyCollMut<"K", "V", undefined> ? true : false,
+    "DictMut<K, V> should extend CollMut<K, V, undefined>"
   >
 >
 
@@ -95,48 +106,53 @@ export interface DictMut<
   Default extends DefaultBoundFor<V> = DefaultFor<V>,
 > extends AbstractDict<K, V, Default> {
   readonly [IS_COLL_MUT]: true
+  clone(): DictMut<K, V, Default>
+  assign(key: K, value: V): void
+  assignMany(entries: IterableOrIterator<[K, V]>): void
   add(entry: [K, V]): void
   addMany(entries: IterableOrIterator<[K, V]>): void
-
-  readonly [IS_DICT_MUT]: true
   set(key: K, value: V): void
-  clone(): DictMut<K, V, Default>
+
+  remove(key: K): void
+  removeMany(keys: IterableOrIterator<K>): void
 }
 
 export function isAbstractDict(
-  value: unknown,
+  value: object | ((..._: unknown[]) => unknown),
 ): value is AbstractDict<unknown, unknown> {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
+    isAbstractColl(value) &&
     IS_ABSTRACT_DICT in value &&
     value[IS_ABSTRACT_DICT] === true
   )
 }
 
-export function isDict(value: unknown): value is Dict<unknown, unknown> {
+export function isDict(
+  value: object | ((..._: unknown[]) => unknown),
+): value is Dict<unknown, unknown> {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    IS_DICT in value &&
-    value[IS_DICT] === true
+    isColl(value) &&
+    IS_ABSTRACT_DICT in value &&
+    value[IS_ABSTRACT_DICT] === true
   )
 }
 
-export function isDictP(value: unknown): value is DictP<unknown, unknown> {
+export function isDictP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is DictP<unknown, unknown> {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    IS_DICT_P in value &&
-    value[IS_DICT_P] === true
+    isCollP(value) &&
+    IS_ABSTRACT_DICT in value &&
+    value[IS_ABSTRACT_DICT] === true
   )
 }
 
-export function isDictMut(value: unknown): value is DictMut<unknown, unknown> {
+export function isDictMut(
+  value: object | ((..._: unknown[]) => unknown),
+): value is DictMut<unknown, unknown> {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    IS_DICT_MUT in value &&
-    value[IS_DICT_MUT] === true
+    isCollMut(value) &&
+    IS_ABSTRACT_DICT in value &&
+    value[IS_ABSTRACT_DICT] === true
   )
 }

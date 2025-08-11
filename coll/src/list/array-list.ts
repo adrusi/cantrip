@@ -4,15 +4,19 @@ import {
   IS_SIZE_ITERABLE,
   ITERATOR,
 } from "@cantrip/compat/iter"
-import { IS_ABSTRACT_COLL, IS_COLL_MUT } from "../types/coll"
-import { IS_ABSTRACT_LIST, IS_LIST_MUT, type ListMut } from "../types/list"
+import { IS_ABSTRACT_COLL, IS_COLL_MUT, IS_ORDERED } from "../types/coll"
+import { IS_ABSTRACT_ASSOC_COLL } from "../types/assoc-coll"
+import { IS_ABSTRACT_INDEX_COLL } from "../types/index-coll"
+import { IS_ABSTRACT_LIST, type ListMut } from "../types/list"
 import { type IterableOrIterator, type BackSizeIter, Iter } from "@cantrip/iter"
 
 export class ArrayList<A> implements ListMut<A> {
   public readonly [IS_ABSTRACT_COLL] = true
   public readonly [IS_COLL_MUT] = true
+  public readonly [IS_ORDERED] = true
+  public readonly [IS_ABSTRACT_ASSOC_COLL] = true
+  public readonly [IS_ABSTRACT_INDEX_COLL] = true
   public readonly [IS_ABSTRACT_LIST] = true
-  public readonly [IS_LIST_MUT] = true
   public readonly [IS_BACK_ITERABLE] = true
   public readonly [IS_SIZE_ITERABLE] = true
 
@@ -46,31 +50,55 @@ export class ArrayList<A> implements ListMut<A> {
     return new ArrayList(this.array.slice(start, end))
   }
 
-  public set(index: number, value: A): void {
+  public assign(index: number, value: A): void {
     this.array[index] = value
   }
 
-  public push(value: A): void {
-    this.array.push(value)
+  public assignMany(entries: IterableOrIterator<[number, A]>): void {
+    for (let [index, value] of Iter.from(entries)) {
+      this.array[index] = value
+    }
   }
 
-  public append(values: IterableOrIterator<A>): void {
-    this.array.push(...Iter.from(values))
+  public splice(
+    start: number,
+    length: number,
+    values: IterableOrIterator<A> = Iter.empty(),
+  ): void {
+    this.array.splice(start, length, ...Iter.from(values))
   }
 
   public size(): number {
     return this.array.length
   }
 
+  public has(index: number): boolean {
+    return index < this.array.length
+  }
+
+  public get(index: number): A {
+    return this.array[index]
+  }
+
+  public pop(): A {
+    if (this.array.length === 0) throw new Error("Index out of bounds")
+    return this.array.pop()!
+  }
+
+  public entries(): BackSizeIter<[number, A]> {
+    let index = 0
+    return Iter.from(this.array).map((x) => [index++, x])
+  }
+
   public iter(): BackSizeIter<A> {
     return Iter.from(this.array)
   }
 
-  public asArray(): A[] {
-    return Array.from(this.array)
+  public [ITERATOR](): BackSizeIterator<A> {
+    return Iter.from(this.array)
   }
 
-  public [ITERATOR](): BackSizeIterator<A> {
+  public [Symbol.iterator](): Iterator<A> {
     return Iter.from(this.array)
   }
 

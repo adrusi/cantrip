@@ -6,22 +6,21 @@ import {
   type Coll,
   type CollP,
   type CollMut,
+  type IS_ABSTRACT_COLL,
   type IS_COLL,
-  isAbstractColl_,
-  isColl_,
-  isCollP_,
-  isCollMut_,
+  type IS_COLL_MUT,
+  type IS_COLL_P,
+  type IS_ORDERED,
+  isAbstractColl,
+  isColl,
+  isCollP,
+  isCollMut,
 } from "./coll"
 
 import type { Assert, Test } from "@cantrip/typelevel"
 import type { SizeIter, IterableOrIterator } from "@cantrip/iter"
 
-export const NOT_PRESENT = Symbol("NOT_PRESENT")
-
-export const IS_ABSTRACT_DICT = Symbol("IS_ABSTRACT_DICT")
-export const IS_DICT = Symbol("IS_DICT")
-export const IS_DICT_P = Symbol("IS_DICT_P")
-export const IS_DICT_MUT = Symbol("IS_DICT_MUT")
+export const IS_ABSTRACT_ASSOC_COLL = Symbol("IS_ABSTRACT_ASSOC_COLL")
 
 type _AbstactAssocCollExtendsAbstractColl = Test<
   Assert<
@@ -30,12 +29,15 @@ type _AbstactAssocCollExtendsAbstractColl = Test<
   >
 >
 
-export interface AbstractAssocColl<K, V, Default = never>
+export interface AbstractAssocColl<K, V, Default>
   extends Iterable<unknown>,
     iterCompat.SizeIterable<unknown> {
-  readonly [IS_COLL]: true
+  readonly [IS_ABSTRACT_COLL]: true
+  readonly [IS_ORDERED]: boolean
+  readonly [IS_ABSTRACT_ASSOC_COLL]: true
   size(): number
   iter(): SizeIter<unknown>
+
   entries(): SizeIter<[K, V]>
   get(key: K): V | Default
   has(key: K): boolean
@@ -48,10 +50,11 @@ type _AssocCollExtendsColl = Test<
   >
 >
 
-export interface AssocColl<K, V, Default = never>
+export interface AssocColl<K, V, Default>
   extends AbstractAssocColl<K, V, Default>,
     coreCompat.Value {
-  asMut(): AssocCollMut<K, V, Default>
+  readonly [IS_COLL]: true
+  toMut(): AssocCollMut<K, V, Default>
 }
 
 type _AssocCollPExtendsCollP = Test<
@@ -61,12 +64,14 @@ type _AssocCollPExtendsCollP = Test<
   >
 >
 
-export interface AssocCollP<K, V, Default = never>
-  extends AssocColl<K, V, Default> {
+export interface AssocCollP<K, V, Default> extends AssocColl<K, V, Default> {
+  readonly [IS_COLL_P]: true
   conj(value: never): AssocCollP<K, V, Default>
   conjMany(entries: IterableOrIterator<never>): AssocCollP<K, V, Default>
 
   assoc(key: K, value: V): AssocCollP<K, V, Default>
+  assocMany(pairs: IterableOrIterator<[K, V]>): AssocCollP<K, V, Default>
+  update(key: K, f: (value: V) => V): AssocCollP<K, V, Default>
 }
 
 type _AssocCollMutExtendsCollMut = Test<
@@ -76,79 +81,53 @@ type _AssocCollMutExtendsCollMut = Test<
   >
 >
 
-export interface AssocCollMut<K, V, Default = never>
+export interface AssocCollMut<K, V, Default>
   extends AbstractAssocColl<K, V, Default> {
-  add(entry: [K, V]): void
-  addMany(entries: IterableOrIterator<[K, V]>): void
-
-  set(key: K, value: V): void
+  readonly [IS_COLL_MUT]: true
   clone(): AssocCollMut<K, V, Default>
-}
+  add(entry: never): void
+  addMany(entries: IterableOrIterator<never>): void
 
-export function isAbstractAssocColl_(
-  value: object | ((..._: unknown[]) => unknown),
-): value is AbstractAssocColl<unknown, unknown, unknown> {
-  return (
-    isAbstractColl_(value) &&
-    "entries" in value &&
-    typeof value.entries === "function" &&
-    "get" in value &&
-    typeof value.get === "function" &&
-    "has" in value &&
-    typeof value.has === "function"
-  )
+  assign(key: K, value: V): void
+  assignMany(entries: IterableOrIterator<[K, V]>): void
 }
 
 export function isAbstractAssocColl(
-  value: unknown,
+  value: object | ((..._: unknown[]) => unknown),
 ): value is AbstractAssocColl<unknown, unknown, unknown> {
   return (
-    (typeof value === "object" || typeof value === "function") &&
-    value !== null &&
-    isAbstractAssocColl_(value)
+    isAbstractColl(value) &&
+    IS_ABSTRACT_ASSOC_COLL in value &&
+    value[IS_ABSTRACT_ASSOC_COLL] === true
   )
-}
-
-export function isAssocColl_(
-  value: AbstractAssocColl<unknown, unknown, unknown> & coreCompat.Value,
-): value is AssocColl<unknown, unknown, unknown> {
-  return isColl_(value)
 }
 
 export function isAssocColl(
-  value: unknown,
+  value: object | ((..._: unknown[]) => unknown),
 ): value is AssocColl<unknown, unknown, unknown> {
   return (
-    coreCompat.isValue(value) &&
-    isAbstractAssocColl_(value) &&
-    isAssocColl_(value)
-  )
-}
-
-export function isAssocCollP_(
-  value: AssocColl<unknown, unknown, unknown>,
-): value is AssocCollP<unknown, unknown, unknown> {
-  return (
-    isCollP_(value) && "assoc" in value && typeof value.assoc === "function"
+    isColl(value) &&
+    IS_ABSTRACT_ASSOC_COLL in value &&
+    value[IS_ABSTRACT_ASSOC_COLL] === true
   )
 }
 
 export function isAssocCollP(
-  value: unknown,
+  value: object | ((..._: unknown[]) => unknown),
 ): value is AssocCollP<unknown, unknown, unknown> {
-  return isAssocColl(value) && isAssocCollP_(value)
-}
-
-export function isAssocCollMut_(
-  value: AbstractAssocColl<unknown, unknown, unknown>,
-): value is AssocCollMut<unknown, unknown, unknown> {
   return (
-    isCollMut_(value) && "assoc" in value && typeof value.assoc === "function"
+    isCollP(value) &&
+    IS_ABSTRACT_ASSOC_COLL in value &&
+    value[IS_ABSTRACT_ASSOC_COLL] === true
   )
 }
 
 export function isAssocCollMut(
-  value: unknown,
+  value: object | ((..._: unknown[]) => unknown),
 ): value is AssocCollMut<unknown, unknown, unknown> {
-  return isAbstractAssocColl(value) && isAssocCollMut_(value)
+  return (
+    isCollMut(value) &&
+    IS_ABSTRACT_ASSOC_COLL in value &&
+    value[IS_ABSTRACT_ASSOC_COLL] === true
+  )
 }
