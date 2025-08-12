@@ -70,11 +70,11 @@ type _ListPExtendsCollP = Test<
 
 export interface ListP<A> extends List<A> {
   readonly [IS_COLL_P]: true
-  conj(value: A): IndexCollP<A>
-  conjMany(entries: IterableOrIterator<A>): IndexCollP<A>
-  assoc(key: number, value: A): IndexCollP<A>
-  assocMany(pairs: IterableOrIterator<[number, A]>): IndexCollP<A>
-  update(key: number, f: (value: A) => A): IndexCollP<A>
+  conj(value: A): ListP<A>
+  conjMany(entries: IterableOrIterator<A>): ListP<A>
+  assoc(key: number, value: A): ListP<A>
+  assocMany(pairs: IterableOrIterator<[number, A]>): ListP<A>
+  update(key: number, f: (value: A) => A): ListP<A>
   slice(start?: number, end?: number): ListP<A>
 
   spliced(
