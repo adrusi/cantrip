@@ -29,6 +29,7 @@ import {
   IS_TRANSIENT_COLL_P,
   IS_ORDERED,
 } from "../types/coll"
+import { hashCollection } from "../hash"
 
 const BIT_WIDTH = 5
 const BRANCH_FACTOR = 0x1 << BIT_WIDTH
@@ -445,7 +446,7 @@ export class BitPartitionedTrieList<A>
   }
 
   public [HASH](): number {
-    throw new Error("Method not implemented.")
+    return hashCollection(this)
   }
 
   public asTransient(): TransientBitPartitionedTrieList<A> {

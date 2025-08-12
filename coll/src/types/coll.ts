@@ -88,3 +88,9 @@ export function isCollMut(
 ): value is AbstractColl {
   return IS_COLL_MUT in value && value[IS_COLL_MUT] === true
 }
+
+export function isOrdered<A extends AbstractColl>(
+  value: A,
+): value is A & { [IS_ORDERED]: true } {
+  return value[IS_ORDERED] === true
+}

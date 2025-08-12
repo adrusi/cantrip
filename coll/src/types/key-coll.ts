@@ -43,8 +43,8 @@ type _AbstractKeyCollExtendsAbstractAssocColl = Test<
 >
 
 export interface AbstractKeyColl<K, V, Default>
-  extends Iterable<unknown>,
-    iterCompat.SizeIterable<unknown> {
+  extends Iterable<[K, V]>,
+    iterCompat.SizeIterable<[K, V]> {
   readonly [IS_ABSTRACT_COLL]: true
   readonly [IS_ORDERED]: boolean
   readonly [IS_ABSTRACT_ASSOC_COLL]: true
