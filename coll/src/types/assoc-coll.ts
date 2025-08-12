@@ -4,16 +4,22 @@ import type * as iterCompat from "@cantrip/compat/iter"
 import {
   type AbstractColl,
   type Coll,
+  type AbstractCollP,
   type CollP,
+  type TransientCollP,
   type CollMut,
   type IS_ABSTRACT_COLL,
   type IS_COLL,
   type IS_COLL_MUT,
+  type IS_ABSTRACT_COLL_P,
   type IS_COLL_P,
+  type IS_TRANSIENT_COLL_P,
   type IS_ORDERED,
   isAbstractColl,
   isColl,
+  isAbstractCollP,
   isCollP,
+  isTransientCollP,
   isCollMut,
 } from "./coll"
 
@@ -57,6 +63,30 @@ export interface AssocColl<K, V, Default>
   toMut(): AssocCollMut<K, V, Default>
 }
 
+type _AbstractAssocCollPExtendsCollP = Test<
+  Assert<
+    AbstractAssocCollP<"K", "V", "Default"> extends AbstractCollP
+      ? true
+      : false,
+    "AbstractAssocCollP<K, V, Default> should extend AbstractCollP"
+  >
+>
+
+export interface AbstractAssocCollP<K, V, Default>
+  extends AssocColl<K, V, Default> {
+  readonly [IS_ABSTRACT_COLL_P]: true
+  conj(value: never): AbstractAssocCollP<K, V, Default>
+  conjMany(
+    entries: IterableOrIterator<never>,
+  ): AbstractAssocCollP<K, V, Default>
+
+  assoc(key: K, value: V): AbstractAssocCollP<K, V, Default>
+  assocMany(
+    pairs: IterableOrIterator<[K, V]>,
+  ): AbstractAssocCollP<K, V, Default>
+  update(key: K, f: (value: V) => V): AbstractAssocCollP<K, V, Default>
+}
+
 type _AssocCollPExtendsCollP = Test<
   Assert<
     AssocCollP<"K", "V", "Default"> extends CollP ? true : false,
@@ -64,14 +94,41 @@ type _AssocCollPExtendsCollP = Test<
   >
 >
 
-export interface AssocCollP<K, V, Default> extends AssocColl<K, V, Default> {
+export interface AssocCollP<K, V, Default>
+  extends AbstractAssocCollP<K, V, Default> {
   readonly [IS_COLL_P]: true
   conj(value: never): AssocCollP<K, V, Default>
   conjMany(entries: IterableOrIterator<never>): AssocCollP<K, V, Default>
+  asTransient(): TransientAssocCollP<K, V, Default>
 
   assoc(key: K, value: V): AssocCollP<K, V, Default>
   assocMany(pairs: IterableOrIterator<[K, V]>): AssocCollP<K, V, Default>
   update(key: K, f: (value: V) => V): AssocCollP<K, V, Default>
+}
+
+type _TransientAssocCollPExtendsCollP = Test<
+  Assert<
+    TransientAssocCollP<"K", "V", "Default"> extends TransientCollP
+      ? true
+      : false,
+    "TransientAssocCollP<K, V, Default> should extend TransientCollP"
+  >
+>
+
+export interface TransientAssocCollP<K, V, Default>
+  extends AbstractAssocCollP<K, V, Default> {
+  readonly [IS_TRANSIENT_COLL_P]: true
+  conj(value: never): TransientAssocCollP<K, V, Default>
+  conjMany(
+    entries: IterableOrIterator<never>,
+  ): TransientAssocCollP<K, V, Default>
+  commit(): AssocCollP<K, V, Default>
+
+  assoc(key: K, value: V): TransientAssocCollP<K, V, Default>
+  assocMany(
+    pairs: IterableOrIterator<[K, V]>,
+  ): TransientAssocCollP<K, V, Default>
+  update(key: K, f: (value: V) => V): TransientAssocCollP<K, V, Default>
 }
 
 type _AssocCollMutExtendsCollMut = Test<
@@ -112,11 +169,31 @@ export function isAssocColl(
   )
 }
 
+export function isAbstractAssocCollP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is AbstractAssocCollP<unknown, unknown, unknown> {
+  return (
+    isAbstractCollP(value) &&
+    IS_ABSTRACT_ASSOC_COLL in value &&
+    value[IS_ABSTRACT_ASSOC_COLL] === true
+  )
+}
+
 export function isAssocCollP(
   value: object | ((..._: unknown[]) => unknown),
 ): value is AssocCollP<unknown, unknown, unknown> {
   return (
     isCollP(value) &&
+    IS_ABSTRACT_ASSOC_COLL in value &&
+    value[IS_ABSTRACT_ASSOC_COLL] === true
+  )
+}
+
+export function isTransientAssocCollP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is TransientAssocCollP<unknown, unknown, unknown> {
+  return (
+    isTransientCollP(value) &&
     IS_ABSTRACT_ASSOC_COLL in value &&
     value[IS_ABSTRACT_ASSOC_COLL] === true
   )

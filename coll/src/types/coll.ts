@@ -5,7 +5,9 @@ import type { SizeIter, IterableOrIterator } from "@cantrip/iter"
 
 export const IS_ABSTRACT_COLL = Symbol("IS_ABSTRACT_COLL")
 export const IS_COLL = Symbol("IS_COLL")
+export const IS_ABSTRACT_COLL_P = Symbol("IS_ABSTRACT_COLL_P")
 export const IS_COLL_P = Symbol("IS_COLL_P")
+export const IS_TRANSIENT_COLL_P = Symbol("IS_TRANSIENT_COLL_P")
 export const IS_COLL_MUT = Symbol("IS_COLL_MUT")
 
 export const IS_ORDERED = Symbol("IS_ORDERED")
@@ -24,10 +26,24 @@ export interface Coll extends AbstractColl, coreCompat.Value {
   toMut(): CollMut
 }
 
-export interface CollP extends Coll {
+export interface AbstractCollP extends Coll {
+  readonly [IS_ABSTRACT_COLL_P]: true
+  conj(entry: never): AbstractCollP
+  conjMany(entries: IterableOrIterator<never>): AbstractCollP
+}
+
+export interface CollP extends AbstractCollP {
   readonly [IS_COLL_P]: true
   conj(entry: never): CollP
   conjMany(entries: IterableOrIterator<never>): CollP
+  asTransient(): TransientCollP
+}
+
+export interface TransientCollP extends AbstractCollP {
+  readonly [IS_TRANSIENT_COLL_P]: true
+  conj(entry: never): TransientCollP
+  conjMany(entries: IterableOrIterator<never>): TransientCollP
+  commit(): CollP
 }
 
 export interface CollMut extends AbstractColl {
@@ -45,14 +61,26 @@ export function isAbstractColl(
 
 export function isColl(
   value: object | ((..._: unknown[]) => unknown),
-): value is AbstractColl {
+): value is Coll {
   return IS_COLL in value && value[IS_COLL] === true
+}
+
+export function isAbstractCollP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is AbstractCollP {
+  return IS_ABSTRACT_COLL_P in value && value[IS_ABSTRACT_COLL_P] === true
 }
 
 export function isCollP(
   value: object | ((..._: unknown[]) => unknown),
-): value is AbstractColl {
+): value is CollP {
   return IS_COLL_P in value && value[IS_COLL_P] === true
+}
+
+export function isTransientCollP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is TransientCollP {
+  return IS_TRANSIENT_COLL_P in value && value[IS_TRANSIENT_COLL_P] === true
 }
 
 export function isCollMut(
