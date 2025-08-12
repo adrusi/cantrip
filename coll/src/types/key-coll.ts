@@ -3,7 +3,9 @@ import type * as iterCompat from "@cantrip/compat/iter"
 import {
   type AbstractAssocColl,
   type AssocColl,
+  type AbstractAssocCollP,
   type AssocCollP,
+  type TransientAssocCollP,
   type AssocCollMut,
   type IS_ABSTRACT_ASSOC_COLL,
 } from "./assoc-coll"
@@ -12,18 +14,22 @@ import {
   type IS_ABSTRACT_COLL,
   type IS_COLL,
   type IS_COLL_MUT,
+  type IS_ABSTRACT_COLL_P,
   type IS_COLL_P,
+  type IS_TRANSIENT_COLL_P,
   type IS_ORDERED,
   isAbstractColl,
   isColl,
+  isAbstractCollP,
   isCollP,
+  isTransientCollP,
   isCollMut,
 } from "./coll"
 import type { SizeIter, IterableOrIterator } from "@cantrip/iter"
 
 export const IS_ABSTRACT_KEY_COLL = Symbol("IS_ABSTRACT_KEY_COLL")
 
-type _AbstactAssocCollExtendsAbstractColl = Test<
+type _AbstractKeyCollExtendsAbstractAssocColl = Test<
   Assert<
     AbstractKeyColl<"K", "V", "Default"> extends AbstractAssocColl<
       "K",
@@ -32,7 +38,7 @@ type _AbstactAssocCollExtendsAbstractColl = Test<
     >
       ? true
       : false,
-    "AbstactKeyColl<K, V, Default> should extend AbstractAssocColl"
+    "AbstractKeyColl<K, V, Default> should extend AbstractAssocColl"
   >
 >
 
@@ -66,23 +72,76 @@ export interface KeyColl<K, V, Default>
   toMut(): KeyCollMut<K, V, Default>
 }
 
-type _KeyCollPExtendsCollP = Test<
+type _AbstractKeyCollPExtendsAbstractAssocCollP = Test<
+  Assert<
+    AbstractKeyCollP<"K", "V", "Default"> extends AbstractAssocCollP<
+      "K",
+      "V",
+      "Default"
+    >
+      ? true
+      : false,
+    "AbstractKeyCollP<K, V, Default> should extend AbstractAssocCollP"
+  >
+>
+
+export interface AbstractKeyCollP<K, V, Default>
+  extends KeyColl<K, V, Default> {
+  readonly [IS_ABSTRACT_COLL_P]: true
+  conj(value: [K, V]): AbstractKeyCollP<K, V, Default>
+  conjMany(entries: IterableOrIterator<[K, V]>): AbstractKeyCollP<K, V, Default>
+
+  assoc(key: K, value: V): AbstractKeyCollP<K, V, Default>
+  assocMany(pairs: IterableOrIterator<[K, V]>): AbstractKeyCollP<K, V, Default>
+  update(key: K, f: (value: V) => V): AbstractKeyCollP<K, V, Default>
+}
+
+type _KeyCollPExtendsAbstractKeyCollP = Test<
   Assert<
     KeyCollP<"K", "V", "Default"> extends AssocCollP<"K", "V", "Default">
       ? true
       : false,
-    "KeyCollP<K, V, Default> should extend AssocCollP"
+    "KeyCollP<K, V, Default> should extend AssocCollP<K, V, Default>"
   >
 >
 
-export interface KeyCollP<K, V, Default> extends KeyColl<K, V, Default> {
+export interface KeyCollP<K, V, Default>
+  extends AbstractKeyCollP<K, V, Default> {
   readonly [IS_COLL_P]: true
   conj(value: [K, V]): KeyCollP<K, V, Default>
   conjMany(entries: IterableOrIterator<[K, V]>): KeyCollP<K, V, Default>
+  asTransient(): TransientKeyCollP<K, V, Default>
 
   assoc(key: K, value: V): KeyCollP<K, V, Default>
   assocMany(pairs: IterableOrIterator<[K, V]>): KeyCollP<K, V, Default>
   update(key: K, f: (value: V) => V): KeyCollP<K, V, Default>
+}
+
+type _TransientKeyCollPExtendsTransientAssocCollP = Test<
+  Assert<
+    TransientKeyCollP<"K", "V", "Default"> extends TransientAssocCollP<
+      "K",
+      "V",
+      "Default"
+    >
+      ? true
+      : false,
+    "TransientKeyCollP<K, V, Default> should extend TransientAssocCollP<K, V, Default>"
+  >
+>
+
+export interface TransientKeyCollP<K, V, Default>
+  extends AbstractKeyCollP<K, V, Default> {
+  readonly [IS_TRANSIENT_COLL_P]: true
+  conj(value: [K, V]): TransientKeyCollP<K, V, Default>
+  conjMany(
+    entries: IterableOrIterator<[K, V]>,
+  ): TransientKeyCollP<K, V, Default>
+  commit(): KeyCollP<K, V, Default>
+
+  assoc(key: K, value: V): TransientKeyCollP<K, V, Default>
+  assocMany(pairs: IterableOrIterator<[K, V]>): TransientKeyCollP<K, V, Default>
+  update(key: K, f: (value: V) => V): TransientKeyCollP<K, V, Default>
 }
 
 type _KeyCollMutExtendsCollMut = Test<
@@ -126,11 +185,31 @@ export function isKeyColl(
   )
 }
 
+export function isAbstractKeyCollP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is AbstractKeyCollP<unknown, unknown, unknown> {
+  return (
+    isAbstractCollP(value) &&
+    IS_ABSTRACT_KEY_COLL in value &&
+    value[IS_ABSTRACT_KEY_COLL] === true
+  )
+}
+
 export function isKeyCollP(
   value: object | ((..._: unknown[]) => unknown),
 ): value is KeyCollP<unknown, unknown, unknown> {
   return (
     isCollP(value) &&
+    IS_ABSTRACT_KEY_COLL in value &&
+    value[IS_ABSTRACT_KEY_COLL] === true
+  )
+}
+
+export function isTransientKeyCollP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is TransientKeyCollP<unknown, unknown, unknown> {
+  return (
+    isTransientCollP(value) &&
     IS_ABSTRACT_KEY_COLL in value &&
     value[IS_ABSTRACT_KEY_COLL] === true
   )

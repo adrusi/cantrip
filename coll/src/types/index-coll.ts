@@ -3,7 +3,9 @@ import type * as iterCompat from "@cantrip/compat/iter"
 import {
   type AbstractAssocColl,
   type AssocColl,
+  type AbstractAssocCollP,
   type AssocCollP,
+  type TransientAssocCollP,
   type AssocCollMut,
   type IS_ABSTRACT_ASSOC_COLL,
 } from "./assoc-coll"
@@ -12,23 +14,27 @@ import {
   type IS_ABSTRACT_COLL,
   type IS_COLL,
   type IS_COLL_MUT,
+  type IS_ABSTRACT_COLL_P,
   type IS_COLL_P,
+  type IS_TRANSIENT_COLL_P,
   type IS_ORDERED,
   isAbstractColl,
   isColl,
+  isAbstractCollP,
   isCollP,
+  isTransientCollP,
   isCollMut,
 } from "./coll"
 import type { SizeIter, IterableOrIterator } from "@cantrip/iter"
 
 export const IS_ABSTRACT_INDEX_COLL = Symbol("IS_ABSTRACT_INDEX_COLL")
 
-type _AbstactAssocCollExtendsAbstractColl = Test<
+type _AbstractIndexCollExtendsAbstractAssocColl = Test<
   Assert<
     AbstractIndexColl<"A"> extends AbstractAssocColl<number, "A", never>
       ? true
       : false,
-    "AbstactAssocColl<K, V, Default> should extend AbstractColl"
+    "AbstractIndexColl<A> should extend AbstractAssocColl<number, A, never>"
   >
 >
 
@@ -46,10 +52,10 @@ export interface AbstractIndexColl<A>
   has(key: number): boolean
 }
 
-type _IndexCollExtendsColl = Test<
+type _IndexCollExtendsAssocColl = Test<
   Assert<
     IndexColl<"A"> extends AssocColl<number, "A", never> ? true : false,
-    "IndexColl<K, V, Default> should extend Coll"
+    "IndexColl<A> should extend AssocColl<number, A, never>"
   >
 >
 
@@ -58,21 +64,61 @@ export interface IndexColl<A> extends AbstractIndexColl<A>, coreCompat.Value {
   toMut(): IndexCollMut<A>
 }
 
-type _IndexCollPExtendsCollP = Test<
+type _AbstractIndexCollPExtendsAbstractAssocCollP = Test<
   Assert<
-    IndexCollP<"A"> extends AssocCollP<number, "A", never> ? true : false,
-    "IndexCollP<K, V, Default> should extend CollP"
+    AbstractIndexCollP<"A"> extends AbstractAssocCollP<number, "A", never>
+      ? true
+      : false,
+    "AbstractIndexCollP<A> should extend AbstractAssocCollP<number, A, never>"
   >
 >
 
-export interface IndexCollP<A> extends IndexColl<A> {
+export interface AbstractIndexCollP<A> extends IndexColl<A> {
+  readonly [IS_ABSTRACT_COLL_P]: true
+  conj(value: A): AbstractIndexCollP<A>
+  conjMany(entries: IterableOrIterator<A>): AbstractIndexCollP<A>
+
+  assoc(key: number, value: A): AbstractIndexCollP<A>
+  assocMany(pairs: IterableOrIterator<[number, A]>): AbstractIndexCollP<A>
+  update(key: number, f: (value: A) => A): AbstractIndexCollP<A>
+}
+
+type _IndexCollPExtendsAssocCollP = Test<
+  Assert<
+    IndexCollP<"A"> extends AssocCollP<number, "A", never> ? true : false,
+    "IndexCollP<A> should extend AssocCollP<A>"
+  >
+>
+
+export interface IndexCollP<A> extends AbstractIndexCollP<A> {
   readonly [IS_COLL_P]: true
   conj(value: A): IndexCollP<A>
   conjMany(entries: IterableOrIterator<A>): IndexCollP<A>
+  asTransient(): TransientIndexCollP<A>
 
   assoc(key: number, value: A): IndexCollP<A>
   assocMany(pairs: IterableOrIterator<[number, A]>): IndexCollP<A>
   update(key: number, f: (value: A) => A): IndexCollP<A>
+}
+
+type _TransientIndexCollPExtendsTransientAssocCollP = Test<
+  Assert<
+    TransientIndexCollP<"A"> extends TransientAssocCollP<number, "A", never>
+      ? true
+      : false,
+    "TransientIndexCollP<A> should extend TransientAssocCollP<number, A, never>"
+  >
+>
+
+export interface TransientIndexCollP<A> extends AbstractIndexCollP<A> {
+  readonly [IS_TRANSIENT_COLL_P]: true
+  conj(value: A): TransientIndexCollP<A>
+  conjMany(entries: IterableOrIterator<A>): TransientIndexCollP<A>
+  commit(): IndexCollP<A>
+
+  assoc(key: number, value: A): TransientIndexCollP<A>
+  assocMany(pairs: IterableOrIterator<[number, A]>): TransientIndexCollP<A>
+  update(key: number, f: (value: A) => A): TransientIndexCollP<A>
 }
 
 type _IndexCollMutExtendsCollMut = Test<
@@ -111,11 +157,31 @@ export function isIndexColl(
   )
 }
 
+export function isAbstractIndexCollP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is AbstractIndexCollP<unknown> {
+  return (
+    isAbstractCollP(value) &&
+    IS_ABSTRACT_INDEX_COLL in value &&
+    value[IS_ABSTRACT_INDEX_COLL] === true
+  )
+}
+
 export function isIndexCollP(
   value: object | ((..._: unknown[]) => unknown),
 ): value is IndexCollP<unknown> {
   return (
     isCollP(value) &&
+    IS_ABSTRACT_INDEX_COLL in value &&
+    value[IS_ABSTRACT_INDEX_COLL] === true
+  )
+}
+
+export function isTransientIndexCollP(
+  value: object | ((..._: unknown[]) => unknown),
+): value is TransientIndexCollP<unknown> {
+  return (
+    isTransientCollP(value) &&
     IS_ABSTRACT_INDEX_COLL in value &&
     value[IS_ABSTRACT_INDEX_COLL] === true
   )
