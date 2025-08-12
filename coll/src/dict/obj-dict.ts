@@ -5,13 +5,19 @@ import {
   type Dict,
   type DictMut,
   IS_ABSTRACT_DICT,
-  IS_DICT,
-  IS_DICT_MUT,
   isDict,
 } from "../types/dict"
 import { EQ, HASH } from "@cantrip/compat/core"
-import { eq, hash } from "@cantrip/core"
-import { IS_ABSTRACT_COLL, IS_COLL, IS_COLL_MUT } from "../types/coll"
+import { eq } from "@cantrip/core"
+import { hashCollection } from "../hash"
+import {
+  IS_ABSTRACT_COLL,
+  IS_COLL,
+  IS_COLL_MUT,
+  IS_ORDERED,
+} from "../types/coll"
+import { IS_ABSTRACT_ASSOC_COLL } from "../types/assoc-coll"
+import { IS_ABSTRACT_KEY_COLL } from "../types/key-coll"
 import {
   IS_ITERATOR,
   IS_SIZE_ITERABLE,
@@ -29,6 +35,9 @@ abstract class AbstractObjDict<
 > implements AbstractDict<K, V, Default>
 {
   public readonly [IS_ABSTRACT_COLL] = true
+  public readonly [IS_ORDERED] = false
+  public readonly [IS_ABSTRACT_ASSOC_COLL] = true
+  public readonly [IS_ABSTRACT_KEY_COLL] = true
   public readonly [IS_ABSTRACT_DICT] = true
   public readonly [IS_SIZE_ITERABLE] = true
 
@@ -38,16 +47,6 @@ abstract class AbstractObjDict<
   public constructor(default_: Default, obj: { [_X in K]: V }) {
     this.obj = obj
     this.default_ = default_
-  }
-
-  public add([key, value]: [K, V]): void {
-    this.obj[key] = value
-  }
-
-  public addMany(entries: IterableOrIterator<[K, V]>): void {
-    for (let [key, value] of Iter.from(entries)) {
-      this.obj[key] = value
-    }
   }
 
   public set(key: K, value: V): void {
@@ -86,6 +85,10 @@ abstract class AbstractObjDict<
         return keys.length + syms.length
       },
     })
+  }
+
+  public entries(): SizeIter<[K, V]> {
+    return this.iter()
   }
 
   public get(key: K): V | Default {
@@ -135,7 +138,6 @@ export class ObjDict<
   implements DictMut<K, V, Default>
 {
   public readonly [IS_COLL_MUT] = true
-  public readonly [IS_DICT_MUT] = true
 
   private constructor(default_: Default, obj: { [_X in K]: V }) {
     super(default_, obj)
@@ -158,6 +160,34 @@ export class ObjDict<
     return new ObjDict(default_, obj)
   }
 
+  public assign(key: K, value: V): void {
+    this.obj[key] = value
+  }
+
+  public assignMany(entries: IterableOrIterator<[K, V]>): void {
+    for (let [key, value] of Iter.from(entries)) {
+      this.obj[key] = value
+    }
+  }
+
+  public add([key, value]: [K, V]): void {
+    this.obj[key] = value
+  }
+
+  public addMany(entries: IterableOrIterator<[K, V]>): void {
+    this.assignMany(entries)
+  }
+
+  public remove(key: K): void {
+    delete this.obj[key]
+  }
+
+  public removeMany(keys: IterableOrIterator<K>): void {
+    for (let key of Iter.from(keys)) {
+      delete this.obj[key]
+    }
+  }
+
   public clone(): DictMut<K, V, Default> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     let newObj: { [_X in K]: V } = Object.create(
@@ -178,7 +208,6 @@ export class RecDict<
   implements Dict<K, V, Default>
 {
   public readonly [IS_COLL] = true
-  public readonly [IS_DICT] = true
 
   private constructor(default_: Default, obj: { [_X in K]: V }) {
     super(default_, obj)
@@ -194,7 +223,7 @@ export class RecDict<
     return new RecDict(default_, newObj)
   }
 
-  asMut(): ObjDict<K, V, Default> {
+  toMut(): ObjDict<K, V, Default> {
     return ObjDict.from(
       this.default_ as DefaultFor<{ [_X in K]: V }[K]>,
       this.obj,
@@ -202,6 +231,11 @@ export class RecDict<
   }
 
   [EQ](other: unknown): boolean {
+    if (
+      !(typeof other === "object" || typeof other === "function") ||
+      other === null
+    )
+      return false
     if (!isDict(other)) return false
     if (this.size() !== other.size()) return false
     for (let [key, value] of this) {
@@ -211,6 +245,6 @@ export class RecDict<
   }
 
   [HASH](): number {
-    throw new Error("Method not implemented.")
+    return hashCollection(this)
   }
 }
