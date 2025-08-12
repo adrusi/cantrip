@@ -129,8 +129,10 @@ export interface TransientListP<A> extends AbstractListP<A> {
   assoc(key: number, value: A): TransientListP<A>
   assocMany(pairs: IterableOrIterator<[number, A]>): TransientListP<A>
   update(key: number, f: (value: A) => A): TransientListP<A>
+  /** @deprecated */
   slice(start?: number, end?: number): TransientListP<A>
 
+  /** @deprecated */
   spliced(
     start: number,
     length: number,

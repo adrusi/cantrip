@@ -1,2 +1,2 @@
 export { eq } from "./eq"
-export { hash } from "./hash"
+export { hash, hashObject } from "./hash"

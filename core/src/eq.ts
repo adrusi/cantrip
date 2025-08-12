@@ -13,7 +13,7 @@ export function eq(a: unknown, b: unknown): boolean {
       return a === b
     case "object":
     case "function":
-      if (compat.isEq(a)) return a[compat.EQ](b)
+      if (compat.isValue(a)) return a[compat.EQ](b)
       return a === b
   }
 }
