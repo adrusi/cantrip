@@ -32,18 +32,30 @@ const MASK = (() => {
   return mask
 })()
 
-// class Node<A> extends Array<A> {
-//   public constructor() {
-//     super(BRANCH_FACTOR)
-//   }
-// }
+class Node<A> {
+  public edit: boolean
+  public readonly array: (A | Node<A>)[]
 
-type Node<A> = (Node<A> | A)[]
-function mkNode<A>(): Node<A> {
-  return new Array(BRANCH_FACTOR)
-}
-function cloneNode<A>(node: Node<A>): Node<A> {
-  return Array.from(node)
+  private constructor(edit: boolean, array: (A | Node<A>)[]) {
+    this.edit = edit
+    this.array = array
+  }
+
+  public static create<A>(edit: boolean = false): Node<A> {
+    return new Node(edit, new Array(BRANCH_FACTOR))
+  }
+
+  public static fromArray<A>(src: A[], edit: boolean = false): Node<A> {
+    const result: Node<A> = Node.create(edit)
+    for (let i = 0; i < BRANCH_FACTOR; i++) result.array[i] = src[i]
+    return result
+  }
+
+  public static from<A>(src: Node<A>, edit: boolean = false): Node<A> {
+    const result: Node<A> = Node.create(edit)
+    for (let i = 0; i < BRANCH_FACTOR; i++) result.array[i] = src.array[i]
+    return result
+  }
 }
 
 const BIT_PARTITIONED_TRIE_LIST_GUARD = Symbol(
@@ -83,8 +95,6 @@ abstract class AbstractBitPartitionedTrieList<A> implements AbstractListP<A> {
     this.count = count
     this.root = root
     this.tail = tail
-
-    Object.freeze(this)
   }
 
   protected tailOffset(): number {
@@ -103,26 +113,26 @@ abstract class AbstractBitPartitionedTrieList<A> implements AbstractListP<A> {
     let node = this.root
     let shift = this.shift
     while (BIT_WIDTH <= shift) {
-      node = node[(index >> shift) & MASK] as Node<A>
+      node = node.array[(index >> shift) & MASK] as Node<A>
       shift -= BIT_WIDTH
     }
 
-    return node as A[]
+    return node.array as A[]
   }
 
   protected pushTail(shift: number, parent: Node<A>, tail: A[]): Node<A> {
     const curDepthIndex = ((this.count - 1) >> shift) & MASK
 
-    let result = cloneNode(parent)
+    let result = Node.from(parent)
 
-    result[curDepthIndex] =
+    result.array[curDepthIndex] =
       BIT_WIDTH === shift
-        ? tail
-        : parent[curDepthIndex] === undefined
-          ? this.newPath(shift - BIT_WIDTH, tail)
+        ? Node.fromArray(tail)
+        : parent.array[curDepthIndex] === undefined
+          ? this.newPath(shift - BIT_WIDTH, Node.fromArray(tail))
           : this.pushTail(
               shift - BIT_WIDTH,
-              parent[curDepthIndex] as Node<A>,
+              parent.array[curDepthIndex] as Node<A>,
               tail,
             )
 
@@ -132,8 +142,8 @@ abstract class AbstractBitPartitionedTrieList<A> implements AbstractListP<A> {
   protected newPath(level: number, node: Node<A>): Node<A> {
     if (level === 0) return node
 
-    let result: Node<A> = mkNode()
-    result[0] = this.newPath(level - BIT_WIDTH, node)
+    let result: Node<A> = Node.create()
+    result.array[0] = this.newPath(level - BIT_WIDTH, node)
     return result
   }
 
@@ -215,12 +225,23 @@ export class BitPartitionedTrieList<A>
 {
   public readonly [IS_COLL_P] = true
 
+  private constructor(
+    guard: typeof BIT_PARTITIONED_TRIE_LIST_GUARD,
+    shift: number,
+    count: number,
+    root: Node<A>,
+    tail: A[],
+  ) {
+    super(guard, shift, count, root, tail)
+    Object.freeze(this)
+  }
+
   private static readonly EMPTY: BitPartitionedTrieList<unknown> =
     new BitPartitionedTrieList(
       BIT_PARTITIONED_TRIE_LIST_GUARD,
       BIT_WIDTH,
       0,
-      mkNode(),
+      Node.create(),
       [],
     )
 
@@ -241,9 +262,9 @@ export class BitPartitionedTrieList<A>
 
     if (0x1 << this.shift < this.count >> BIT_WIDTH) {
       // this.root is full
-      const newRoot: Node<A> = mkNode()
-      newRoot[0] = this.root
-      newRoot[1] = this.newPath(this.shift, this.tail)
+      const newRoot: Node<A> = Node.create()
+      newRoot.array[0] = this.root
+      newRoot.array[1] = this.newPath(this.shift, Node.fromArray(this.tail))
       return new BitPartitionedTrieList(
         BIT_PARTITIONED_TRIE_LIST_GUARD,
         this.shift + BIT_WIDTH,
