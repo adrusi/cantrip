@@ -8,8 +8,21 @@ import { EQ, HASH } from "@cantrip/compat/core"
 import { type IterableOrIterator, type BackSizeIter, Iter } from "@cantrip/iter"
 import { IS_ABSTRACT_INDEX_COLL } from "../types/index-coll"
 import { IS_ABSTRACT_ASSOC_COLL } from "../types/assoc-coll"
-import { type ListP, type ListMut, IS_ABSTRACT_LIST } from "../types/list"
-import { IS_ABSTRACT_COLL, IS_COLL, IS_COLL_P, IS_ORDERED } from "../types/coll"
+import {
+  type AbstractListP,
+  type ListP,
+  type TransientListP,
+  type ListMut,
+  IS_ABSTRACT_LIST,
+} from "../types/list"
+import {
+  IS_ABSTRACT_COLL,
+  IS_COLL,
+  IS_ABSTRACT_COLL_P,
+  IS_COLL_P,
+  IS_TRANSIENT_COLL_P,
+  IS_ORDERED,
+} from "../types/coll"
 
 const BIT_WIDTH = 5
 const BRANCH_FACTOR = 0x1 << BIT_WIDTH
@@ -37,7 +50,7 @@ const BIT_PARTITIONED_TRIE_LIST_GUARD = Symbol(
   "BIT_PARTITIONED_TRIE_LIST_GUARD",
 )
 
-export class BitPartitionedTrieList<A> implements ListP<A> {
+abstract class AbstractBitPartitionedTrieList<A> implements AbstractListP<A> {
   public readonly [IS_ABSTRACT_COLL] = true
   public readonly [IS_ORDERED] = true
   public readonly [IS_ABSTRACT_ASSOC_COLL] = true
@@ -45,28 +58,15 @@ export class BitPartitionedTrieList<A> implements ListP<A> {
   public readonly [IS_ABSTRACT_LIST] = true
   public readonly [IS_BACK_ITERABLE] = true
   public readonly [IS_SIZE_ITERABLE] = true
-  public readonly [IS_COLL_P] = true
+  public readonly [IS_ABSTRACT_COLL_P] = true
   public readonly [IS_COLL] = true
 
-  private readonly shift: number
-  private readonly count: number
-  private readonly root: Node<A>
-  private readonly tail: A[]
+  protected readonly shift: number
+  protected readonly count: number
+  protected readonly root: Node<A>
+  protected readonly tail: A[]
 
-  private static readonly EMPTY: BitPartitionedTrieList<unknown> =
-    new BitPartitionedTrieList(
-      BIT_PARTITIONED_TRIE_LIST_GUARD,
-      BIT_WIDTH,
-      0,
-      mkNode(),
-      [],
-    )
-
-  public static empty<A>(): BitPartitionedTrieList<A> {
-    return BitPartitionedTrieList.EMPTY as BitPartitionedTrieList<A>
-  }
-
-  private constructor(
+  protected constructor(
     guard: typeof BIT_PARTITIONED_TRIE_LIST_GUARD,
     shift: number,
     count: number,
@@ -87,13 +87,13 @@ export class BitPartitionedTrieList<A> implements ListP<A> {
     Object.freeze(this)
   }
 
-  private tailOffset(): number {
+  protected tailOffset(): number {
     return this.count < BRANCH_FACTOR
       ? 0
       : ((this.count - 1) >> BIT_WIDTH) << BIT_WIDTH
   }
 
-  private arrayFor(index: number): A[] {
+  protected arrayFor(index: number): A[] {
     if (index < 0 || this.count <= index) {
       throw new Error("Index out of bounds")
     }
@@ -110,7 +110,7 @@ export class BitPartitionedTrieList<A> implements ListP<A> {
     return node as A[]
   }
 
-  private pushTail(shift: number, parent: Node<A>, tail: A[]): Node<A> {
+  protected pushTail(shift: number, parent: Node<A>, tail: A[]): Node<A> {
     const curDepthIndex = ((this.count - 1) >> shift) & MASK
 
     let result = cloneNode(parent)
@@ -129,7 +129,7 @@ export class BitPartitionedTrieList<A> implements ListP<A> {
     return result
   }
 
-  private newPath(level: number, node: Node<A>): Node<A> {
+  protected newPath(level: number, node: Node<A>): Node<A> {
     if (level === 0) return node
 
     let result: Node<A> = mkNode()
@@ -141,70 +141,36 @@ export class BitPartitionedTrieList<A> implements ListP<A> {
     return this.arrayFor(index)[index & MASK]
   }
 
-  public conj(value: A): BitPartitionedTrieList<A> {
-    if (this.tail.length < BRANCH_FACTOR) {
-      return new BitPartitionedTrieList(
-        BIT_PARTITIONED_TRIE_LIST_GUARD,
-        this.shift,
-        this.count + 1,
-        this.root,
-        [...this.tail, value],
-      )
-    }
+  public abstract conj(value: A): AbstractBitPartitionedTrieList<A>
 
-    if (0x1 << this.shift < this.count >> BIT_WIDTH) {
-      // this.root is full
-      const newRoot: Node<A> = mkNode()
-      newRoot[0] = this.root
-      newRoot[1] = this.newPath(this.shift, this.tail)
-      return new BitPartitionedTrieList(
-        BIT_PARTITIONED_TRIE_LIST_GUARD,
-        this.shift + BIT_WIDTH,
-        this.count + 1,
-        newRoot,
-        [value],
-      )
-    }
+  public abstract conjMany(
+    entries: IterableOrIterator<A>,
+  ): AbstractBitPartitionedTrieList<A>
 
-    // add tail as new leaf node in existing trie
-    return new BitPartitionedTrieList(
-      BIT_PARTITIONED_TRIE_LIST_GUARD,
-      this.shift,
-      this.count + 1,
-      this.pushTail(this.shift, this.root, this.tail),
-      [value],
-    )
-  }
+  public abstract assoc(
+    key: number,
+    value: A,
+  ): AbstractBitPartitionedTrieList<A>
 
-  public conjMany(entries: IterableOrIterator<A>): BitPartitionedTrieList<A> {
-    throw new Error("Method not implemented.")
-  }
-
-  public assoc(key: number, value: A): BitPartitionedTrieList<A> {
-    throw new Error("Method not implemented.")
-  }
-
-  public assocMany(
+  public abstract assocMany(
     pairs: IterableOrIterator<[number, A]>,
-  ): BitPartitionedTrieList<A> {
-    throw new Error("Method not implemented.")
-  }
+  ): AbstractBitPartitionedTrieList<A>
 
-  public update(key: number, f: (value: A) => A): BitPartitionedTrieList<A> {
-    throw new Error("Method not implemented.")
-  }
+  public abstract update(
+    key: number,
+    f: (value: A) => A,
+  ): AbstractBitPartitionedTrieList<A>
 
-  public slice(start?: number, end?: number): BitPartitionedTrieList<A> {
-    throw new Error("Method not implemented.")
-  }
+  public abstract slice(
+    start?: number,
+    end?: number,
+  ): AbstractBitPartitionedTrieList<A>
 
-  public spliced(
+  public abstract spliced(
     start: number,
     length: number,
-    values: IterableOrIterator<A> = Iter.empty(),
-  ): BitPartitionedTrieList<A> {
-    throw new Error("Method not implemented.")
-  }
+    values?: IterableOrIterator<A>,
+  ): AbstractBitPartitionedTrieList<A>
 
   public toMut(): ListMut<A> {
     throw new Error("Method not implemented.")
@@ -239,6 +205,159 @@ export class BitPartitionedTrieList<A> implements ListP<A> {
   }
 
   public [HASH](): number {
+    throw new Error("Method not implemented.")
+  }
+}
+
+export class BitPartitionedTrieList<A>
+  extends AbstractBitPartitionedTrieList<A>
+  implements ListP<A>
+{
+  public readonly [IS_COLL_P] = true
+
+  private static readonly EMPTY: BitPartitionedTrieList<unknown> =
+    new BitPartitionedTrieList(
+      BIT_PARTITIONED_TRIE_LIST_GUARD,
+      BIT_WIDTH,
+      0,
+      mkNode(),
+      [],
+    )
+
+  public static empty<A>(): BitPartitionedTrieList<A> {
+    return BitPartitionedTrieList.EMPTY as BitPartitionedTrieList<A>
+  }
+
+  public override conj(value: A): BitPartitionedTrieList<A> {
+    if (this.tail.length < BRANCH_FACTOR) {
+      return new BitPartitionedTrieList(
+        BIT_PARTITIONED_TRIE_LIST_GUARD,
+        this.shift,
+        this.count + 1,
+        this.root,
+        [...this.tail, value],
+      )
+    }
+
+    if (0x1 << this.shift < this.count >> BIT_WIDTH) {
+      // this.root is full
+      const newRoot: Node<A> = mkNode()
+      newRoot[0] = this.root
+      newRoot[1] = this.newPath(this.shift, this.tail)
+      return new BitPartitionedTrieList(
+        BIT_PARTITIONED_TRIE_LIST_GUARD,
+        this.shift + BIT_WIDTH,
+        this.count + 1,
+        newRoot,
+        [value],
+      )
+    }
+
+    // add tail as new leaf node in existing trie
+    return new BitPartitionedTrieList(
+      BIT_PARTITIONED_TRIE_LIST_GUARD,
+      this.shift,
+      this.count + 1,
+      this.pushTail(this.shift, this.root, this.tail),
+      [value],
+    )
+  }
+
+  public override conjMany(
+    entries: IterableOrIterator<A>,
+  ): BitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override assoc(key: number, value: A): BitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override assocMany(
+    pairs: IterableOrIterator<[number, A]>,
+  ): BitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override update(
+    key: number,
+    f: (value: A) => A,
+  ): BitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override slice(
+    start?: number,
+    end?: number,
+  ): BitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override spliced(
+    start: number,
+    length: number,
+    values: IterableOrIterator<A> = Iter.empty(),
+  ): BitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public asTransient(): TransientBitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+}
+
+export class TransientBitPartitionedTrieList<A>
+  extends AbstractBitPartitionedTrieList<A>
+  implements TransientListP<A>
+{
+  public readonly [IS_TRANSIENT_COLL_P] = true
+
+  public override conj(value: A): TransientBitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override conjMany(
+    entries: IterableOrIterator<A>,
+  ): TransientBitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override assoc(
+    key: number,
+    value: A,
+  ): TransientBitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override assocMany(
+    pairs: IterableOrIterator<[number, A]>,
+  ): TransientBitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override update(
+    key: number,
+    f: (value: A) => A,
+  ): TransientBitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override slice(
+    start?: number,
+    end?: number,
+  ): TransientBitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public override spliced(
+    start: number,
+    length: number,
+    values: IterableOrIterator<A> = Iter.empty(),
+  ): TransientBitPartitionedTrieList<A> {
+    throw new Error("Method not implemented.")
+  }
+
+  public commit(): BitPartitionedTrieList<A> {
     throw new Error("Method not implemented.")
   }
 }
