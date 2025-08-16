@@ -40,18 +40,20 @@ const BRANCH_FACTOR = 0x1 << BIT_WIDTH
 const MASK = BRANCH_FACTOR - 1
 const MAX_SHIFT = Math.floor(32 / BIT_WIDTH) * BIT_WIDTH
 
+type Entry<K, V> = { key: K; value: V; next: null | Entry<K, V> }
+
 class Node<K, V> {
   public editToken: symbol | null
   public bitmap: number
   // TODO refactor this so that leaves are linked lists
   // this is only more efficient if you optimize for leaves having more than two entries on average
   // which is ridiculous
-  public array: ([K, V][] | Node<K, V>)[]
+  public array: (Entry<K, V> | Node<K, V>)[]
 
   public constructor(
     edit: symbol | null,
     bitmap: number,
-    array: ([K, V][] | Node<K, V>)[],
+    array: (Entry<K, V> | Node<K, V>)[],
   ) {
     this.editToken = edit
     this.bitmap = bitmap
@@ -274,8 +276,10 @@ export class HashArrayMappedTrieDict<
         continue
       }
 
-      for (let [entryKey, entryValue] of node.array[offset]) {
-        if (eq(entryKey, key)) return entryValue
+      let entry: Entry<K, V> | null = node.array[offset]
+      while (entry !== null) {
+        if (eq(entry.key, key)) return entry.value
+        entry = entry.next
       }
       return this.default_
     }
@@ -356,10 +360,10 @@ export class HashArrayMappedTrieDict<
         // (i.e. this code)
         const { newNode: intermediate } = this.assocImpl(
           Node.create(),
-          hash(cellValue[0][0]),
+          hash(cellValue.key),
           shift + BIT_WIDTH,
-          cellValue[0][0],
-          cellValue[0][1],
+          cellValue.key,
+          cellValue.value,
         )
         const { newNode: newBranch } = this.assocImpl(
           intermediate as Node<K, V>,
@@ -376,27 +380,14 @@ export class HashArrayMappedTrieDict<
       }
 
       // cant expand the trie horizontally anymore, so we start adding to the bucket
-      for (let i = 0; i < cellValue.length; i++) {
-        if (eq(cellValue[i][0], key)) {
-          const newNode = Node.from(node)
-          newNode.array[offset] = [
-            ...cellValue.slice(0, i),
-            [key, value],
-            ...cellValue.slice(i + 1),
-          ]
-          return {
-            newNode,
-            newCount: this.count,
-          }
-        }
-      }
-
       const newNode = Node.from(node)
-      newNode.array[offset] = [[key, value], ...cellValue]
-      return {
-        newNode,
-        newCount: this.count + 1,
-      }
+      const { newBucket, newCount } = this.assocBucketImpl(
+        cellValue,
+        key,
+        value,
+      )
+      newNode.array[offset] = newBucket
+      return { newNode, newCount }
     }
 
     const newNode: Node<K, V> = new Node(
@@ -410,7 +401,7 @@ export class HashArrayMappedTrieDict<
     for (let i = 0; i < offset; i++) {
       newNode.array[i] = node.array[i]
     }
-    newNode.array[offset] = [[key, value]]
+    newNode.array[offset] = { key, value, next: null }
     for (let i = offset + 1; i < newNode.array.length; i++) {
       newNode.array[i] = node.array[i - 1]
     }
@@ -418,6 +409,31 @@ export class HashArrayMappedTrieDict<
     return {
       newNode,
       newCount: this.count + 1,
+    }
+  }
+
+  private assocBucketImpl(
+    bucket: Entry<K, V> | null,
+    key: K,
+    value: V,
+  ): { readonly newBucket: Entry<K, V>; readonly newCount: number } {
+    if (bucket === null) {
+      return { newBucket: { key, value, next: null }, newCount: this.count + 1 }
+    }
+    if (eq(bucket.key, key)) {
+      return {
+        newBucket: { key: bucket.key, value, next: bucket.next },
+        newCount: this.count,
+      }
+    }
+    const { newBucket: next, newCount } = this.assocBucketImpl(
+      bucket.next,
+      key,
+      value,
+    )
+    return {
+      newBucket: { key: bucket.key, value: bucket.value, next },
+      newCount,
     }
   }
 
