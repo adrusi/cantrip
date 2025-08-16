@@ -20,6 +20,8 @@ import type {
   DefaultFor,
 } from "./types/dict"
 
+import { HostedHashDict } from "./dict/hosted-hash-dict"
+
 import type { IterableOrIterator } from "@cantrip/iter"
 
 export type DictP<

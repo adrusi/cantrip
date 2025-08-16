@@ -33,11 +33,7 @@ import { hashCollection } from "../hash"
 
 const BIT_WIDTH = 5
 const BRANCH_FACTOR = 0x1 << BIT_WIDTH
-const MASK = (() => {
-  let mask = 0
-  for (let i = 0; i < BIT_WIDTH; i++) mask |= 0x1 << i
-  return mask
-})()
+const MASK = BRANCH_FACTOR - 1
 
 class Node<A> {
   public editToken: symbol | null
@@ -65,7 +61,10 @@ class Node<A> {
   }
 
   public editable(token: symbol | null): Node<A> {
-    if (token === null) return Node.from(this)
+    if (token === null) {
+      if (this.editToken === null) return this
+      return Node.from(this)
+    }
     return this.editToken === token ? this : Node.from(this, token)
   }
 }
