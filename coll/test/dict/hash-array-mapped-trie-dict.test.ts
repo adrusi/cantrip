@@ -36,7 +36,7 @@ describe("HashArrayMappedTrieDict", () => {
     const n = 32 * 32 * 2
 
     let xs: HashArrayMappedTrieDict<number, number> =
-      HashArrayMappedTrieDict.empty(undefined)
+      HashArrayMappedTrieDict.withDefault(undefined)
 
     for (let i = 0; i < n; i++) {
       xs = xs.assoc(i, i)
@@ -53,7 +53,7 @@ describe("HashArrayMappedTrieDict", () => {
     const n = 32 * 32 * 2
 
     let xs: HashArrayMappedTrieDict<number, number> =
-      HashArrayMappedTrieDict.empty(undefined)
+      HashArrayMappedTrieDict.withDefault(undefined)
 
     for (let i = 0; i < n; i++) {
       xs = xs.assoc(i, i)
@@ -78,7 +78,7 @@ describe("HashArrayMappedTrieDict", () => {
     const n = 32 * 32 * 2
 
     let xs: HashArrayMappedTrieDict<number, number> =
-      HashArrayMappedTrieDict.empty(undefined)
+      HashArrayMappedTrieDict.withDefault(undefined)
 
     for (let i = 0; i < n; i++) {
       xs = xs.assoc(i, i)
@@ -97,5 +97,25 @@ describe("HashArrayMappedTrieDict", () => {
         expect(xs.get(i)).toEqual(i)
       }
     }
+  })
+
+  test("idfk4", () => {
+    const n = 32 * 32 * 2
+
+    let xs: HashArrayMappedTrieDict<number, number> =
+      HashArrayMappedTrieDict.withDefault(undefined)
+
+    for (let i = 0; i < n; i++) {
+      xs = xs.assoc(i, i)
+    }
+
+    const keys = []
+
+    for (let [k, _v] of xs) {
+      keys.push(k)
+    }
+
+    keys.sort((a, b) => a - b)
+    expect(keys).toEqual(Array.from({ length: n }, (_, i) => i))
   })
 })

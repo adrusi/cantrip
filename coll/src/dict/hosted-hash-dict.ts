@@ -93,6 +93,10 @@ export class HostedHashDict<
   }
 
   public set(key: K, value: V): void {
+    if (value === (this.default_ as unknown)) {
+      throw new Error("tried to store default value in dict")
+    }
+
     let bucket = this.obj[hash(key)]
     if (bucket === undefined) {
       bucket = this.obj[hash(key)] = [[key, value]]

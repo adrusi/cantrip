@@ -8,8 +8,9 @@ import {
   type DictMut,
   IS_ABSTRACT_DICT,
   NOT_PRESENT,
+  isDict,
 } from "../types/dict"
-import { eq, hash } from "@cantrip/core"
+import { eq, hash, hashObject } from "@cantrip/core"
 import { EQ, HASH } from "@cantrip/compat/core"
 import {
   IS_ABSTRACT_COLL,
@@ -30,6 +31,8 @@ import {
   type SizeIterator,
 } from "@cantrip/compat/iter"
 import { Iter, type IterableOrIterator, type SizeIter } from "@cantrip/iter"
+import { hashCollection } from "../hash"
+import { HostedHashDict } from "./hosted-hash-dict"
 
 const HASH_ARRAY_MAPPED_TRIE_DICT_GUARD = Symbol(
   "HASH_ARRAY_MAPPED_TRIE_DICT_GUARD",
@@ -45,9 +48,6 @@ type Entry<K, V> = { key: K; value: V; next: null | Entry<K, V> }
 class Node<K, V> {
   public editToken: symbol | null
   public bitmap: number
-  // TODO refactor this so that leaves are linked lists
-  // this is only more efficient if you optimize for leaves having more than two entries on average
-  // which is ridiculous
   public array: (Entry<K, V> | Node<K, V>)[]
 
   public constructor(
@@ -83,6 +83,48 @@ class Node<K, V> {
       return Node.from(this)
     }
     return this.editToken === token ? this : Node.from(this, token)
+  }
+
+  public iter(): Iter<[K, V]> {
+    const array = this.array
+    let i = 0
+    let bucket: Entry<K, V> | null = null
+    let child: Iter<[K, V]> | null = null
+
+    return Iter.from({
+      [IS_ITERATOR]: true,
+
+      next(): IteratorResult<[K, V]> {
+        while (true) {
+          if (bucket !== null) {
+            const value: [K, V] = [bucket.key, bucket.value]
+            bucket = bucket.next
+            return { done: false, value }
+          }
+
+          if (child !== null) {
+            const { done, value } = child.next()
+            if (done) {
+              child = null
+            } else {
+              return { done: false, value }
+            }
+          }
+
+          if (i < array.length) {
+            const src = array[i++]
+            if (src instanceof Node) {
+              child = src.iter()
+              continue
+            }
+            bucket = src
+            continue
+          }
+
+          return { done: true, value: undefined }
+        }
+      },
+    })
   }
 }
 
@@ -129,9 +171,101 @@ export abstract class AbstractHashArrayMappedTrieDict<
     this.root = root
   }
 
-  public abstract get(key: K): V | Default
+  public get(key: K): V | Default {
+    const hashCode = hash(key)
 
-  public abstract has(key: K): boolean
+    let shift = 0
+    let node = this.root
+    while (shift < MAX_SHIFT) {
+      const index = (hashCode >> shift) & MASK
+      if (!(node.bitmap & (0x1 << index))) return this.default_
+
+      const offset = popCount(node.bitmap & ((0x1 << index) - 1))
+      if (node.array[offset] instanceof Node) {
+        node = node.array[offset]
+        shift += BIT_WIDTH
+        continue
+      }
+
+      let entry: Entry<K, V> | null = node.array[offset]
+      while (entry !== null) {
+        if (eq(entry.key, key)) return entry.value
+        entry = entry.next
+      }
+      return this.default_
+    }
+
+    return this.default_ // satisfy typescript
+  }
+
+  public has(key: K): boolean {
+    return this.get(key) !== this.default_
+  }
+
+  protected assocBucketImpl(
+    bucket: Entry<K, V> | null,
+    key: K,
+    value: V,
+  ): { readonly newBucket: Entry<K, V>; readonly newCount: number } {
+    if (bucket === null) {
+      return { newBucket: { key, value, next: null }, newCount: this.count + 1 }
+    }
+    if (eq(bucket.key, key)) {
+      return {
+        newBucket: { key: bucket.key, value, next: bucket.next },
+        newCount: this.count,
+      }
+    }
+    const { newBucket: next, newCount } = this.assocBucketImpl(
+      bucket.next,
+      key,
+      value,
+    )
+    return {
+      newBucket: { key: bucket.key, value: bucket.value, next },
+      newCount,
+    }
+  }
+
+  protected updateBucketImpl(
+    bucket: Entry<K, V> | null,
+    key: K,
+    f: (value: V) => V,
+  ): Entry<K, V> | null {
+    if (bucket === null) return null
+    if (eq(bucket.key, key)) {
+      return {
+        key: bucket.key,
+        value: f(bucket.value),
+        next: bucket.next,
+      }
+    }
+    const next = this.updateBucketImpl(bucket.next, key, f)
+    return { key: bucket.key, value: bucket.value, next }
+  }
+
+  protected withoutBucketImpl(
+    bucket: Entry<K, V> | null,
+    key: K,
+  ): { readonly newBucket: Entry<K, V> | null; readonly newCount: number } {
+    if (bucket === null) {
+      return { newBucket: null, newCount: this.count }
+    }
+    if (eq(bucket.key, key)) {
+      return {
+        newBucket: bucket.next,
+        newCount: this.count - 1,
+      }
+    }
+    const { newBucket: next, newCount } = this.withoutBucketImpl(
+      bucket.next,
+      key,
+    )
+    return {
+      newBucket: { key: bucket.key, value: bucket.value, next },
+      newCount,
+    }
+  }
 
   public abstract conj(
     value: [K, V],
@@ -167,12 +301,35 @@ export abstract class AbstractHashArrayMappedTrieDict<
     other: AbstractDict<K, V, Default>,
   ): AbstractHashArrayMappedTrieDict<K, V, Default>
 
+  public abstract [EQ](other: unknown): boolean
+
+  public abstract [HASH](): number
+
   public size(): number {
     return this.count
   }
 
   public iter(): SizeIter<[K, V]> {
-    throw new Error("Method not implemented.")
+    const count = this.count
+    const src = this.root.iter()
+    let nEmitted = 0
+
+    return Iter.from({
+      [IS_ITERATOR]: true,
+
+      next(): IteratorResult<[K, V]> {
+        const { done, value } = src.next()
+        if (done) {
+          return { done, value }
+        }
+        nEmitted++
+        return { done, value }
+      },
+
+      [SIZE](): number {
+        return count - nEmitted
+      },
+    })
   }
 
   public entries(): SizeIter<[K, V]> {
@@ -187,16 +344,8 @@ export abstract class AbstractHashArrayMappedTrieDict<
     return this.iter()
   }
 
-  public [EQ](other: unknown): boolean {
-    throw new Error("Method not implemented.")
-  }
-
-  public [HASH](): number {
-    throw new Error("Method not implemented.")
-  }
-
   public toMut(): DictMut<K, V, Default> {
-    throw new Error("Method not implemented.")
+    return HostedHashDict.fromEntries(this.default_, this)
   }
 }
 
@@ -243,9 +392,11 @@ export class HashArrayMappedTrieDict<
     Node.create(),
   )
 
-  public static empty<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>(
-    default_: Default,
-  ): HashArrayMappedTrieDict<K, V, Default> {
+  public static withDefault<
+    K,
+    V,
+    Default extends DefaultBoundFor<V> = DefaultFor<V>,
+  >(default_: Default): HashArrayMappedTrieDict<K, V, Default> {
     if (default_ === undefined) {
       return HashArrayMappedTrieDict.EMPTY_UNDEFINED as unknown as HashArrayMappedTrieDict<
         K,
@@ -260,35 +411,28 @@ export class HashArrayMappedTrieDict<
     >
   }
 
-  public override get(key: K): V | Default {
-    const hashCode = hash(key)
-
-    let shift = 0
-    let node = this.root
-    while (shift < MAX_SHIFT) {
-      const index = (hashCode >> shift) & MASK
-      if (!(node.bitmap & (0x1 << index))) return this.default_
-
-      const offset = popCount(node.bitmap & ((0x1 << index) - 1))
-      if (node.array[offset] instanceof Node) {
-        node = node.array[offset]
-        shift += BIT_WIDTH
-        continue
-      }
-
-      let entry: Entry<K, V> | null = node.array[offset]
-      while (entry !== null) {
-        if (eq(entry.key, key)) return entry.value
-        entry = entry.next
-      }
-      return this.default_
-    }
-
-    return this.default_ // satisfy typescript
+  public static fromEntries<
+    K,
+    V,
+    Default extends DefaultBoundFor<V> = DefaultFor<V>,
+  >(
+    default_: Default,
+    entries: IterableOrIterator<[K, V]>,
+  ): HashArrayMappedTrieDict<K, V, Default> {
+    return this.withDefault<K, V, Default>(default_).assocMany(entries)
   }
 
-  public override has(key: K): boolean {
-    return this.get(key) !== this.default_
+  public static of<K, V>(
+    ...entries: [K, V][]
+  ): undefined extends V
+    ? never
+    : HashArrayMappedTrieDict<K, V, DefaultFor<V>> {
+    return HashArrayMappedTrieDict.fromEntries(
+      undefined as unknown as DefaultFor<V>,
+      entries,
+    ) as undefined extends V
+      ? never
+      : HashArrayMappedTrieDict<K, V, DefaultFor<V>>
   }
 
   public override conj([key, value]: [K, V]): HashArrayMappedTrieDict<
@@ -302,13 +446,17 @@ export class HashArrayMappedTrieDict<
   public override conjMany(
     value: IterableOrIterator<[K, V]>,
   ): HashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    return this.asTransient().conjMany(value).commit()
   }
 
   public override assoc(
     key: K,
     value: V,
   ): HashArrayMappedTrieDict<K, V, Default> {
+    if (value === (this.default_ as unknown)) {
+      throw new Error("tried to store default value in dict")
+    }
+
     const hashCode = hash(key)
 
     const { newNode, newCount } = this.assocImpl(
@@ -421,35 +569,10 @@ export class HashArrayMappedTrieDict<
     }
   }
 
-  private assocBucketImpl(
-    bucket: Entry<K, V> | null,
-    key: K,
-    value: V,
-  ): { readonly newBucket: Entry<K, V>; readonly newCount: number } {
-    if (bucket === null) {
-      return { newBucket: { key, value, next: null }, newCount: this.count + 1 }
-    }
-    if (eq(bucket.key, key)) {
-      return {
-        newBucket: { key: bucket.key, value, next: bucket.next },
-        newCount: this.count,
-      }
-    }
-    const { newBucket: next, newCount } = this.assocBucketImpl(
-      bucket.next,
-      key,
-      value,
-    )
-    return {
-      newBucket: { key: bucket.key, value: bucket.value, next },
-      newCount,
-    }
-  }
-
   public override assocMany(
     pairs: IterableOrIterator<[K, V]>,
   ): HashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    return this.asTransient().assocMany(pairs).commit()
   }
 
   public override update(
@@ -458,7 +581,12 @@ export class HashArrayMappedTrieDict<
   ): HashArrayMappedTrieDict<K, V, Default> {
     const hashCode = hash(key)
 
-    const newNode = this.updateImpl(this.root, hashCode, 0, key, f)
+    const newNode = this.updateImpl(this.root, hashCode, 0, key, (value: V) => {
+      if (value === (this.default_ as unknown)) {
+        throw new Error("tried to store default value in dict")
+      }
+      return f(value)
+    })
 
     return new HashArrayMappedTrieDict(
       HASH_ARRAY_MAPPED_TRIE_DICT_GUARD,
@@ -523,23 +651,6 @@ export class HashArrayMappedTrieDict<
     return node
   }
 
-  private updateBucketImpl(
-    bucket: Entry<K, V> | null,
-    key: K,
-    f: (value: V) => V,
-  ): Entry<K, V> | null {
-    if (bucket === null) return null
-    if (eq(bucket.key, key)) {
-      return {
-        key: bucket.key,
-        value: f(bucket.value),
-        next: bucket.next,
-      }
-    }
-    const next = this.updateBucketImpl(bucket.next, key, f)
-    return { key: bucket.key, value: bucket.value, next }
-  }
-
   public override without(key: K): HashArrayMappedTrieDict<K, V, Default> {
     const hashCode = hash(key)
 
@@ -555,7 +666,7 @@ export class HashArrayMappedTrieDict<
     }
 
     if (newNode === null) {
-      return HashArrayMappedTrieDict.empty(this.default_)
+      return HashArrayMappedTrieDict.withDefault(this.default_)
     }
 
     const newRoot = new Node(null, 0x1 << (hashCode & MASK), [newNode])
@@ -673,43 +784,49 @@ export class HashArrayMappedTrieDict<
     }
   }
 
-  private withoutBucketImpl(
-    bucket: Entry<K, V> | null,
-    key: K,
-  ): { readonly newBucket: Entry<K, V> | null; readonly newCount: number } {
-    if (bucket === null) {
-      return { newBucket: null, newCount: this.count }
-    }
-    if (eq(bucket.key, key)) {
-      return {
-        newBucket: bucket.next,
-        newCount: this.count - 1,
-      }
-    }
-    const { newBucket: next, newCount } = this.withoutBucketImpl(
-      bucket.next,
-      key,
-    )
-    return {
-      newBucket: { key: bucket.key, value: bucket.value, next },
-      newCount,
-    }
-  }
-
   public override withoutMany(
     keys: IterableOrIterator<K>,
   ): HashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    return this.asTransient().withoutMany(keys).commit()
   }
 
   public override merge(
     other: AbstractDict<K, V, Default>,
   ): HashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    return this.assocMany(other)
+  }
+
+  public override [EQ](other: unknown): boolean {
+    if (
+      !(
+        (typeof other === "object" || typeof other === "function") &&
+        other !== null &&
+        isDict(other)
+      )
+    ) {
+      return false
+    }
+    if (this.size() !== other.size()) return false
+    if (other[IS_ORDERED]) return false
+    for (let [key, value] of this) {
+      if (!eq(other.get(key), value)) return false
+    }
+    return true
+  }
+
+  public override [HASH](): number {
+    return hashCollection(this)
   }
 
   public asTransient(): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    const editToken = Symbol()
+    const newRoot = Node.from(this.root, editToken)
+    return new TransientHashArrayMappedTrieDict(
+      HASH_ARRAY_MAPPED_TRIE_DICT_GUARD,
+      this.default_,
+      this.count,
+      newRoot,
+    )
   }
 }
 
@@ -723,56 +840,382 @@ export class TransientHashArrayMappedTrieDict<
 {
   public readonly [IS_TRANSIENT_COLL_P] = true
 
-  public override get(key: K): V | Default {
-    throw new Error("Method not implemented.")
+  private ensureEditable(): void {
+    if (this.root.editToken === null) {
+      throw new Error("TransientHashArrayMappedTrieDict used after commit")
+    }
   }
-  public override has(key: K): boolean {
-    throw new Error("Method not implemented.")
+
+  public override conj([key, value]: [K, V]): TransientHashArrayMappedTrieDict<
+    K,
+    V,
+    Default
+  > {
+    return this.assoc(key, value)
   }
-  public override conj(
-    value: [K, V],
-  ): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
-  }
+
   public override conjMany(
-    value: IterableOrIterator<[K, V]>,
+    entries: IterableOrIterator<[K, V]>,
   ): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    for (let [key, value] of Iter.from(entries)) {
+      this.assoc(key, value)
+    }
+    return this
   }
+
   public override assoc(
     key: K,
     value: V,
   ): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    this.ensureEditable()
+    if (value === (this.default_ as unknown)) {
+      throw new Error("tried to store default value in dict")
+    }
+
+    const hashCode = hash(key)
+
+    const { newNode, newCount } = this.assocImpl(
+      this.root,
+      hashCode,
+      0,
+      key,
+      value,
+    )
+    this.root = newNode
+    this.count = newCount
+
+    return this
   }
+
+  private assocImpl(
+    node: Node<K, V>,
+    hashCode: number,
+    shift: number,
+    key: K,
+    value: V,
+  ): { readonly newNode: Node<K, V>; readonly newCount: number } {
+    const index = (hashCode >> shift) & MASK
+
+    if (node.bitmap & (0x1 << index)) {
+      // this index is represented in the node's array
+      const offset = popCount(node.bitmap & ((0x1 << index) - 1))
+      const cellValue = node.array[offset]
+
+      if (cellValue instanceof Node) {
+        const result = node.editable(this.root.editToken)
+        const { newNode, newCount } = this.assocImpl(
+          cellValue,
+          hashCode,
+          shift + BIT_WIDTH,
+          key,
+          value,
+        )
+        result.array[offset] = newNode
+        return { newNode: result, newCount }
+      }
+
+      if (shift < MAX_SHIFT) {
+        // this bucket should have exactly one entry,
+        // since new entries that would have collided with it would have expanded the trie horizontally
+        // (i.e. this code)
+
+        if (eq(cellValue.key, key)) {
+          const newNode = node.editable(this.root.editToken)
+          newNode.array[offset] = { key: cellValue.key, value, next: null }
+          return { newNode, newCount: this.count }
+        }
+
+        const { newNode: intermediate } = this.assocImpl(
+          Node.create(this.root.editToken),
+          hash(cellValue.key),
+          shift + BIT_WIDTH,
+          cellValue.key,
+          cellValue.value,
+        )
+        const { newNode: newBranch } = this.assocImpl(
+          intermediate as Node<K, V>,
+          hashCode,
+          shift + BIT_WIDTH,
+          key,
+          value,
+        )
+
+        const newNode = node.editable(this.root.editToken)
+        newNode.array[offset] = newBranch
+
+        return { newNode, newCount: this.count + 1 }
+      }
+
+      // cant expand the trie horizontally anymore, so we start adding to the bucket
+      const newNode = node.editable(this.root.editToken)
+      const { newBucket, newCount } = this.assocBucketImpl(
+        cellValue,
+        key,
+        value,
+      )
+      newNode.array[offset] = newBucket
+      return { newNode, newCount }
+    }
+
+    // we need to allocate space for a new leaf within this node
+
+    const newNode: Node<K, V> = new Node(
+      this.root.editToken,
+      node.bitmap | (0x1 << index),
+      new Array(node.array.length + 1),
+    )
+
+    const offset = popCount(node.bitmap & ((0x1 << index) - 1))
+
+    for (let i = 0; i < offset; i++) {
+      newNode.array[i] = node.array[i]
+    }
+    newNode.array[offset] = { key, value, next: null }
+    for (let i = offset + 1; i < newNode.array.length; i++) {
+      newNode.array[i] = node.array[i - 1]
+    }
+
+    return {
+      newNode,
+      newCount: this.count + 1,
+    }
+  }
+
   public override assocMany(
     pairs: IterableOrIterator<[K, V]>,
   ): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    for (let [k, v] of Iter.from(pairs)) {
+      this.assoc(k, v)
+    }
+    return this
   }
+
   public override update(
     key: K,
     f: (value: V) => V,
   ): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    this.ensureEditable()
+
+    const hashCode = hash(key)
+
+    const newNode = this.updateImpl(this.root, hashCode, 0, key, (value: V) => {
+      if (value === (this.default_ as unknown)) {
+        throw new Error("tried to store default value in dict")
+      }
+
+      return f(value)
+    })
+    this.root = newNode
+
+    return this
   }
+
+  private updateImpl(
+    node: Node<K, V>,
+    hashCode: number,
+    shift: number,
+    key: K,
+    f: (value: V) => V,
+  ): Node<K, V> {
+    const index = (hashCode >> shift) & MASK
+
+    if (node.bitmap & (0x1 << index)) {
+      // this index is represented in the node's array
+      const offset = popCount(node.bitmap & ((0x1 << index) - 1))
+      const cellValue = node.array[offset]
+
+      if (cellValue instanceof Node) {
+        const result = node.editable(this.root.editToken)
+        const newNode = this.updateImpl(
+          cellValue,
+          hashCode,
+          shift + BIT_WIDTH,
+          key,
+          f,
+        )
+        result.array[offset] = newNode
+        return result
+      }
+
+      if (shift < MAX_SHIFT) {
+        // this bucket should have exactly one entry,
+        // since new entries that would have collided with it would have expanded the trie horizontally
+        // (i.e. this code)
+
+        if (eq(cellValue.key, key)) {
+          const newNode = node.editable(this.root.editToken)
+          newNode.array[offset] = {
+            key: cellValue.key,
+            value: f(cellValue.value),
+            next: null,
+          }
+          return newNode
+        }
+
+        return node
+      }
+
+      // cant expand the trie horizontally anymore, so we start adding to the bucket
+      const newNode = node.editable(this.root.editToken)
+      const newBucket = this.updateBucketImpl(cellValue, key, f)
+      newNode.array[offset] = newBucket as Entry<K, V>
+      return newNode
+    }
+
+    return node
+  }
+
   public override without(
     key: K,
   ): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    this.ensureEditable()
+
+    const hashCode = hash(key)
+
+    const { newNode, newCount } = this.withoutImpl(this.root, hashCode, 0, key)
+    this.root = newNode as Node<K, V>
+    this.count = newCount
+
+    return this
   }
+
+  private withoutImpl(
+    node: Node<K, V>,
+    hashCode: number,
+    shift: number,
+    key: K,
+  ): {
+    readonly newNode: Node<K, V> | Entry<K, V> | null
+    readonly newCount: number
+  } {
+    const index = (hashCode >> shift) & MASK
+
+    if (node.bitmap & (0x1 << index)) {
+      // this index is represented in the node's array
+      const offset = popCount(node.bitmap & ((0x1 << index) - 1))
+      const cellValue = node.array[offset]
+
+      if (cellValue instanceof Node) {
+        const { newNode, newCount } = this.withoutImpl(
+          cellValue,
+          hashCode,
+          shift + BIT_WIDTH,
+          key,
+        )
+
+        if (newNode === null) {
+          // the child node needs to be compacted
+          if (1 < popCount(node.bitmap & ~(0x1 << index))) {
+            // there are still other children of this node, so we dont need to signal for compaction
+            const newNode: Node<K, V> = new Node(
+              this.root.editToken,
+              node.bitmap & ~(0x1 << index),
+              new Array(node.array.length - 1),
+            )
+
+            for (let i = 0; i < offset; i++) {
+              newNode.array[i] = node.array[i]
+            }
+            for (let i = offset + 1; i < node.array.length; i++) {
+              newNode.array[i - 1] = node.array[i]
+            }
+
+            return { newNode, newCount }
+          }
+
+          // there was only one remaining child of the node, so we return the child as the new node, compacting this node away
+          return { newNode: node.array[offset === 0 ? 1 : 0], newCount }
+        } else {
+          const result = node.editable(this.root.editToken)
+          result.array[offset] = newNode
+          return { newNode: result, newCount }
+        }
+      }
+
+      if (shift < MAX_SHIFT) {
+        // this bucket should have exactly one entry,
+        // since new entries that would have collided with it would have expanded the trie horizontally
+        // (i.e. this code)
+
+        if (eq(cellValue.key, key)) {
+          if (1 < popCount(node.bitmap & ~(0x1 << index))) {
+            // there are still other children of this node
+            const newNode: Node<K, V> = new Node(
+              this.root.editToken,
+              node.bitmap & ~(0x1 << index),
+              new Array(node.array.length - 1),
+            )
+
+            for (let i = 0; i < offset; i++) {
+              newNode.array[i] = node.array[i]
+            }
+            for (let i = offset + 1; i < node.array.length; i++) {
+              newNode.array[i - 1] = node.array[i]
+            }
+
+            return { newNode, newCount: this.count - 1 }
+          }
+
+          // there is only one remaining child of the node, so we need to return that child as the node
+          return {
+            newNode: node.array[offset === 0 ? 1 : 0],
+            newCount: this.count - 1,
+          }
+        }
+
+        // the key isnt found in the dict, so do nothing
+        return { newNode: node, newCount: this.count }
+      }
+
+      const { newBucket, newCount } = this.withoutBucketImpl(cellValue, key)
+      if (newBucket !== null) {
+        const newNode = node.editable(this.root.editToken)
+        newNode.array[offset] = newBucket
+        return { newNode, newCount }
+      }
+
+      // bucket is empty; signal for compation
+      return { newNode: null, newCount }
+    }
+
+    // key isnt present
+    return {
+      newNode: node,
+      newCount: this.count,
+    }
+  }
+
   public override withoutMany(
     keys: IterableOrIterator<K>,
   ): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    for (let key of Iter.from(keys)) {
+      this.without(key)
+    }
+    return this
   }
+
   public override merge(
     other: AbstractDict<K, V, Default>,
   ): TransientHashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    return this.assocMany(other)
+  }
+
+  public override [EQ](other: unknown): boolean {
+    return this === other
+  }
+
+  public override [HASH](): number {
+    return hashObject(this)
   }
 
   public commit(): HashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    this.ensureEditable()
+    this.root.editToken = null
+    return new HashArrayMappedTrieDict(
+      HASH_ARRAY_MAPPED_TRIE_DICT_GUARD,
+      this.default_,
+      this.count,
+      this.root,
+    )
   }
 }

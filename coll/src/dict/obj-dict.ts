@@ -50,6 +50,10 @@ abstract class AbstractObjDict<
   }
 
   public set(key: K, value: V): void {
+    if (value === (this.default_ as unknown)) {
+      throw new Error("tried to store default value in dict")
+    }
+
     this.obj[key] = value
   }
 
@@ -161,6 +165,10 @@ export class ObjDict<
   }
 
   public assign(key: K, value: V): void {
+    if (value === (this.default_ as unknown)) {
+      throw new Error("tried to store default value in dict")
+    }
+
     this.obj[key] = value
   }
 
@@ -171,6 +179,10 @@ export class ObjDict<
   }
 
   public add([key, value]: [K, V]): void {
+    if (value === (this.default_ as unknown)) {
+      throw new Error("tried to store default value in dict")
+    }
+
     this.obj[key] = value
   }
 
