@@ -42,6 +42,8 @@ describe("HashArrayMappedTrieDict", () => {
       xs = xs.assoc(i, i)
     }
 
+    expect(xs.size()).toEqual(n)
+
     for (let i = 0; i < n; i++) {
       expect(xs.get(i)).toEqual(i)
     }
@@ -61,9 +63,36 @@ describe("HashArrayMappedTrieDict", () => {
       xs = xs.update(i, (x) => x * 2)
     }
 
+    expect(xs.size()).toEqual(n)
+
     for (let i = 0; i < n; i++) {
       if (i % 2 === 0) {
         expect(xs.get(i)).toEqual(2 * i)
+      } else {
+        expect(xs.get(i)).toEqual(i)
+      }
+    }
+  })
+
+  test("idfk3", () => {
+    const n = 32 * 32 * 2
+
+    let xs: HashArrayMappedTrieDict<number, number> =
+      HashArrayMappedTrieDict.empty(undefined)
+
+    for (let i = 0; i < n; i++) {
+      xs = xs.assoc(i, i)
+    }
+
+    for (let i = 0; i < n; i += 2) {
+      xs = xs.without(i)
+    }
+
+    expect(xs.size()).toEqual(n / 2)
+
+    for (let i = 0; i < n; i++) {
+      if (i % 2 === 0) {
+        expect(xs.get(i)).toEqual(undefined)
       } else {
         expect(xs.get(i)).toEqual(i)
       }

@@ -168,7 +168,7 @@ export abstract class AbstractHashArrayMappedTrieDict<
   ): AbstractHashArrayMappedTrieDict<K, V, Default>
 
   public size(): number {
-    throw new Error("Method not implemented.")
+    return this.count
   }
 
   public iter(): SizeIter<[K, V]> {
@@ -362,7 +362,7 @@ export class HashArrayMappedTrieDict<
         if (eq(cellValue.key, key)) {
           const newNode = Node.from(node)
           newNode.array[offset] = { key: cellValue.key, value, next: null }
-          return { newNode, newCount: this.count + 1 }
+          return { newNode, newCount: this.count }
         }
 
         const { newNode: intermediate } = this.assocImpl(
@@ -545,11 +545,25 @@ export class HashArrayMappedTrieDict<
 
     const { newNode, newCount } = this.withoutImpl(this.root, hashCode, 0, key)
 
+    if (newNode instanceof Node) {
+      return new HashArrayMappedTrieDict(
+        HASH_ARRAY_MAPPED_TRIE_DICT_GUARD,
+        this.default_,
+        newCount,
+        newNode,
+      )
+    }
+
+    if (newNode === null) {
+      return HashArrayMappedTrieDict.empty(this.default_)
+    }
+
+    const newRoot = new Node(null, 0x1 << (hashCode & MASK), [newNode])
     return new HashArrayMappedTrieDict(
       HASH_ARRAY_MAPPED_TRIE_DICT_GUARD,
       this.default_,
       newCount,
-      newNode,
+      newRoot,
     )
   }
 
@@ -558,8 +572,128 @@ export class HashArrayMappedTrieDict<
     hashCode: number,
     shift: number,
     key: K,
-  ): { readonly newNode: Node<K, V>; readonly newCount: number } {
-    throw new Error("Method not implemented.")
+  ): {
+    readonly newNode: Node<K, V> | Entry<K, V> | null
+    readonly newCount: number
+  } {
+    const index = (hashCode >> shift) & MASK
+
+    if (node.bitmap & (0x1 << index)) {
+      // this index is represented in the node's array
+      const offset = popCount(node.bitmap & ((0x1 << index) - 1))
+      const cellValue = node.array[offset]
+
+      if (cellValue instanceof Node) {
+        const { newNode, newCount } = this.withoutImpl(
+          cellValue,
+          hashCode,
+          shift + BIT_WIDTH,
+          key,
+        )
+
+        if (newNode === null) {
+          // the child node needs to be compacted
+          if (1 < popCount(node.bitmap & ~(0x1 << index))) {
+            // there are still other children of this node, so we dont need to signal for compaction
+            const newNode: Node<K, V> = new Node(
+              null,
+              node.bitmap & ~(0x1 << index),
+              new Array(node.array.length - 1),
+            )
+
+            for (let i = 0; i < offset; i++) {
+              newNode.array[i] = node.array[i]
+            }
+            for (let i = offset + 1; i < node.array.length; i++) {
+              newNode.array[i - 1] = node.array[i]
+            }
+
+            return { newNode, newCount }
+          }
+
+          // there was only one remaining child of the node, so we return the child as the new node, compacting this node away
+          return { newNode: node.array[offset === 0 ? 1 : 0], newCount }
+        } else {
+          const result = Node.from(node)
+          result.array[offset] = newNode
+          return { newNode: result, newCount }
+        }
+      }
+
+      if (shift < MAX_SHIFT) {
+        // this bucket should have exactly one entry,
+        // since new entries that would have collided with it would have expanded the trie horizontally
+        // (i.e. this code)
+
+        if (eq(cellValue.key, key)) {
+          if (1 < popCount(node.bitmap & ~(0x1 << index))) {
+            // there are still other children of this node
+            const newNode: Node<K, V> = new Node(
+              null,
+              node.bitmap & ~(0x1 << index),
+              new Array(node.array.length - 1),
+            )
+
+            for (let i = 0; i < offset; i++) {
+              newNode.array[i] = node.array[i]
+            }
+            for (let i = offset + 1; i < node.array.length; i++) {
+              newNode.array[i - 1] = node.array[i]
+            }
+
+            return { newNode, newCount: this.count - 1 }
+          }
+
+          // there is only one remaining child of the node, so we need to return that child as the node
+          return {
+            newNode: node.array[offset === 0 ? 1 : 0],
+            newCount: this.count - 1,
+          }
+        }
+
+        // the key isnt found in the dict, so do nothing
+        return { newNode: node, newCount: this.count }
+      }
+
+      const { newBucket, newCount } = this.withoutBucketImpl(cellValue, key)
+      if (newBucket !== null) {
+        const newNode = Node.from(node)
+        newNode.array[offset] = newBucket
+        return { newNode, newCount }
+      }
+
+      // bucket is empty; signal for compation
+      return { newNode: null, newCount }
+    }
+
+    // key isnt present
+    return {
+      newNode: node,
+      newCount: this.count,
+    }
+  }
+
+  private withoutBucketImpl(
+    bucket: Entry<K, V> | null,
+    key: K,
+  ): { readonly newBucket: Entry<K, V> | null; readonly newCount: number } {
+    if (bucket === null) {
+      return { newBucket: null, newCount: this.count }
+    }
+    if (eq(bucket.key, key)) {
+      return {
+        newBucket: bucket.next,
+        newCount: this.count - 1,
+      }
+    }
+    const { newBucket: next, newCount } = this.withoutBucketImpl(
+      bucket.next,
+      key,
+    )
+    return {
+      newBucket: { key: bucket.key, value: bucket.value, next },
+      newCount,
+    }
   }
 
   public override withoutMany(
