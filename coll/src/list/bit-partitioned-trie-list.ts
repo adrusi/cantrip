@@ -401,7 +401,7 @@ export class BitPartitionedTrieList<A>
   ): BitPartitionedTrieList<A> {
     // TODO this can sometimes avoid some copying
     const result = BitPartitionedTrieList.empty<A>().asTransient()
-    for (let i = start; i < end; i++) {
+    for (let i = start; i < Math.min(this.count, end); i++) {
       result.conj(this.get(i))
     }
     return result.commit()
@@ -413,7 +413,7 @@ export class BitPartitionedTrieList<A>
     values: IterableOrIterator<A> = Iter.empty(),
   ): BitPartitionedTrieList<A> {
     const result = BitPartitionedTrieList.empty<A>().asTransient()
-    for (let i = 0; i < start; i++) {
+    for (let i = 0; i < Math.min(this.count, start); i++) {
       result.conj(this.get(i))
     }
     for (let x of Iter.from(values)) {
@@ -494,7 +494,7 @@ export class TransientBitPartitionedTrieList<A>
   }
 
   private ensureEditable(): void {
-    if (this.root.editToken !== this.root.editToken) {
+    if (this.root.editToken === null) {
       throw new Error("Transient used after .commit()")
     }
   }
@@ -555,6 +555,8 @@ export class TransientBitPartitionedTrieList<A>
     index: number,
     f: (value: A) => A,
   ): TransientBitPartitionedTrieList<A> {
+    this.ensureEditable()
+
     if (index < 0 || this.count <= index) {
       throw new Error("Index out of bounds")
     }
