@@ -21,6 +21,7 @@ import type {
 } from "./types/dict"
 
 import { HostedHashDict } from "./dict/hosted-hash-dict"
+import { HashArrayMappedTrieDict } from "./dict/hash-array-mapped-trie-dict"
 
 import type { IterableOrIterator } from "@cantrip/iter"
 
@@ -42,49 +43,24 @@ function dictPWithDefault<
   V,
   Default extends DefaultBoundFor<V> = DefaultFor<V>,
 >(_default_: Default): DictP_<K, V, Default> {
-  throw new Error("Not implemented")
+  return HashArrayMappedTrieDict.withDefault(_default_)
 }
 
 function dictPFromEntries<
   K,
   V,
   Default extends DefaultBoundFor<V> = DefaultFor<V>,
->(default_: Default, entries: IterableOrIterator<[K, V]>): DictP_<K, V, Default>
-
-function dictPFromEntries<K, V>(
-  ...args:
-    | [IterableOrIterator<[K, V]>]
-    | [undefined | symbol, IterableOrIterator<[K, V]>]
-): DictP_<K, V, DefaultFor<V>> {
-  const _default_ = args.length === 1 ? undefined : args[0]
-  const _entries = args.length === 1 ? args[0] : args[1]
-
-  throw new Error("Not implemented")
+>(
+  default_: Default,
+  entries: IterableOrIterator<[K, V]>,
+): DictP_<K, V, Default> {
+  return HashArrayMappedTrieDict.fromEntries(default_, entries)
 }
 
 function dictPOf<K, V>(
   ...entries: [K, V][]
-): undefined extends V ? never : DictP_<K, V, DefaultFor<V>>
-
-function dictPOf<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>(
-  default_: Default,
-  ...entries: [K, V][]
-): DictP_<K, V, Default>
-
-function dictPOf<K, V>(
-  ...args: [K, V][] | [undefined | symbol, ...[K, V][]]
-): DictP_<K, V, DefaultFor<V>> {
-  const _default_ =
-    typeof args[0] === "symbol" || typeof args[0] === "undefined"
-      ? args[0]
-      : undefined
-  const _entries = (
-    typeof args[0] === "symbol" || typeof args[0] === "undefined"
-      ? args.slice(1)
-      : args
-  ) as [K, V][]
-
-  throw new Error("Not implemented")
+): undefined extends V ? never : DictP_<K, V, DefaultFor<V>> {
+  return HashArrayMappedTrieDict.of(...entries)
 }
 
 export type DictMut<
@@ -105,7 +81,7 @@ function dictMutWithDefault<
   V,
   Default extends DefaultBoundFor<V> = DefaultFor<V>,
 >(_default_: Default): DictMut_<K, V, Default> {
-  throw new Error("Not implemented")
+  return HostedHashDict.withDefault(_default_)
 }
 
 function dictMutFromEntries<
@@ -115,49 +91,12 @@ function dictMutFromEntries<
 >(
   default_: Default,
   entries: IterableOrIterator<[K, V]>,
-): DictMut_<K, V, Default>
-
-function dictMutFromEntries<
-  K,
-  V,
-  Default extends DefaultBoundFor<V> = DefaultFor<V>,
->(
-  default_: Default,
-  entries: IterableOrIterator<[K, V]>,
-): DictMut_<K, V, Default>
-
-function dictMutFromEntries<K, V>(
-  ...args:
-    | [IterableOrIterator<[K, V]>]
-    | [undefined | symbol, IterableOrIterator<[K, V]>]
-): DictMut_<K, V, DefaultFor<V>> {
-  const _default_ = args.length === 1 ? undefined : args[0]
-  const _entries = args.length === 1 ? args[0] : args[1]
-
-  throw new Error("Not implemented")
+): DictMut_<K, V, Default> {
+  return HostedHashDict.fromEntries(default_ as Default, entries)
 }
 
 function dictMutOf<K, V>(
   ...entries: [K, V][]
-): undefined extends V ? never : DictMut_<K, V, DefaultFor<V>>
-
-function dictMutOf<K, V, Default extends DefaultBoundFor<V> = DefaultFor<V>>(
-  default_: Default,
-  ...entries: [K, V][]
-): DictMut_<K, V, Default>
-
-function dictMutOf<K, V>(
-  ...args: [K, V][] | [undefined | symbol, ...[K, V][]]
-): DictMut_<K, V, DefaultFor<V>> {
-  const _default_ =
-    typeof args[0] === "symbol" || typeof args[0] === "undefined"
-      ? args[0]
-      : undefined
-  const _entries = (
-    typeof args[0] === "symbol" || typeof args[0] === "undefined"
-      ? args.slice(1)
-      : args
-  ) as [K, V][]
-
-  throw new Error("Not implemented")
+): undefined extends V ? never : DictMut_<K, V, DefaultFor<V>> {
+  return HostedHashDict.of(...entries)
 }
