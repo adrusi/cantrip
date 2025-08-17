@@ -358,6 +358,13 @@ export class HashArrayMappedTrieDict<
         // this bucket should have exactly one entry,
         // since new entries that would have collided with it would have expanded the trie horizontally
         // (i.e. this code)
+
+        if (eq(cellValue.key, key)) {
+          const newNode = Node.from(node)
+          newNode.array[offset] = { key: cellValue.key, value, next: null }
+          return { newNode, newCount: this.count + 1 }
+        }
+
         const { newNode: intermediate } = this.assocImpl(
           Node.create(),
           hash(cellValue.key),
@@ -389,6 +396,8 @@ export class HashArrayMappedTrieDict<
       newNode.array[offset] = newBucket
       return { newNode, newCount }
     }
+
+    // we need to allocate space for a new leaf within this node
 
     const newNode: Node<K, V> = new Node(
       null,
@@ -447,7 +456,88 @@ export class HashArrayMappedTrieDict<
     key: K,
     f: (value: V) => V,
   ): HashArrayMappedTrieDict<K, V, Default> {
-    throw new Error("Method not implemented.")
+    const hashCode = hash(key)
+
+    const newNode = this.updateImpl(this.root, hashCode, 0, key, f)
+
+    return new HashArrayMappedTrieDict(
+      HASH_ARRAY_MAPPED_TRIE_DICT_GUARD,
+      this.default_,
+      this.count,
+      newNode,
+    )
+  }
+
+  private updateImpl(
+    node: Node<K, V>,
+    hashCode: number,
+    shift: number,
+    key: K,
+    f: (value: V) => V,
+  ): Node<K, V> {
+    const index = (hashCode >> shift) & MASK
+
+    if (node.bitmap & (0x1 << index)) {
+      // this index is represented in the node's array
+      const offset = popCount(node.bitmap & ((0x1 << index) - 1))
+      const cellValue = node.array[offset]
+
+      if (cellValue instanceof Node) {
+        const result = Node.from(node)
+        const newNode = this.updateImpl(
+          cellValue,
+          hashCode,
+          shift + BIT_WIDTH,
+          key,
+          f,
+        )
+        result.array[offset] = newNode
+        return result
+      }
+
+      if (shift < MAX_SHIFT) {
+        // this bucket should have exactly one entry,
+        // since new entries that would have collided with it would have expanded the trie horizontally
+        // (i.e. this code)
+
+        if (eq(cellValue.key, key)) {
+          const newNode = Node.from(node)
+          newNode.array[offset] = {
+            key: cellValue.key,
+            value: f(cellValue.value),
+            next: null,
+          }
+          return newNode
+        }
+
+        return node
+      }
+
+      // cant expand the trie horizontally anymore, so we start adding to the bucket
+      const newNode = Node.from(node)
+      const newBucket = this.updateBucketImpl(cellValue, key, f)
+      newNode.array[offset] = newBucket as Entry<K, V>
+      return newNode
+    }
+
+    return node
+  }
+
+  private updateBucketImpl(
+    bucket: Entry<K, V> | null,
+    key: K,
+    f: (value: V) => V,
+  ): Entry<K, V> | null {
+    if (bucket === null) return null
+    if (eq(bucket.key, key)) {
+      return {
+        key: bucket.key,
+        value: f(bucket.value),
+        next: bucket.next,
+      }
+    }
+    const next = this.updateBucketImpl(bucket.next, key, f)
+    return { key: bucket.key, value: bucket.value, next }
   }
 
   public override without(key: K): HashArrayMappedTrieDict<K, V, Default> {
